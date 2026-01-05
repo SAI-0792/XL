@@ -157,3 +157,25 @@ export const cancelBooking = async (bookingId: string) => {
 
     return booking;
 };
+
+export const extendBooking = async (bookingId: string, additionalHours: number) => {
+    const booking = await Booking.findById(bookingId);
+    if (!booking) {
+        throw new Error('Booking not found');
+    }
+
+    if (booking.status !== 'ACTIVE' && booking.status !== 'PENDING_ARRIVAL') {
+        throw new Error('Cannot extend a completed or cancelled booking');
+    }
+
+    // Calculate additional cost
+    const extraCost = additionalHours * 50; // Use same rate
+
+    // Update times
+    const currentEndTime = new Date(booking.endTime);
+    booking.endTime = new Date(currentEndTime.getTime() + additionalHours * 60 * 60 * 1000);
+    booking.totalCost += extraCost;
+
+    await booking.save();
+    return booking;
+};

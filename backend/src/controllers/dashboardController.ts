@@ -2,25 +2,43 @@ import { Request, Response } from 'express';
 import mongoose from 'mongoose';
 import Booking from '../models/Booking';
 import ParkingSlot from '../models/ParkingSlot';
+import User from '../models/User';
 
 export const getDashboardStats = async (req: Request, res: Response) => {
     try {
-        // req.user is added by authMiddleware
         const userId = (req as any).user.id;
+        const user = await User.findById(userId);
 
-        // Calculate Total Bookings for this user
-        const totalBookings = await Booking.countDocuments({ userId });
+        const userPlates = user?.managedCars || [];
 
-        // Calculate Total Revenue for this user
+        // Query matches either the userId specifically OR the carNumber if it's one of user's plates
+        const bookingQuery = {
+            $or: [
+                { userId: userId },
+                { carNumber: { $in: userPlates } }
+            ]
+        };
+
+        // Calculate Total Bookings
+        const totalBookings = await Booking.countDocuments(bookingQuery);
+
+        // Calculate Total Revenue
         const revenueResult = await Booking.aggregate([
-            { $match: { userId: new mongoose.Types.ObjectId(userId) } },
+            {
+                $match: {
+                    $or: [
+                        { userId: new mongoose.Types.ObjectId(userId) },
+                        { carNumber: { $in: userPlates } }
+                    ]
+                }
+            },
             { $group: { _id: null, total: { $sum: "$totalCost" } } }
         ]);
         const totalRevenue = revenueResult.length > 0 ? revenueResult[0].total : 0;
 
-        // Get Current Active Booking for this user
+        // Get Current Active Booking
         const activeBooking = await Booking.findOne({
-            userId,
+            ...bookingQuery,
             status: { $in: ['PENDING_ARRIVAL', 'ACTIVE'] }
         })
             .sort({ createdAt: -1 })

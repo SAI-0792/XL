@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import SlotMap from '../components/SlotMap';
 import Sidebar from '../components/Sidebar';
-import { fetchSlots, fetchDashboardStats } from '../services/api';
+import { fetchSlots, fetchDashboardStats, extendBooking } from '../services/api';
+import PaymentModal from '../components/PaymentModal';
 
 const UserDashboardPage = () => {
     const [stats, setStats] = useState<any>({
@@ -12,6 +13,9 @@ const UserDashboardPage = () => {
     });
     const [activeBooking, setActiveBooking] = useState<any>(null);
     const [slots, setSlots] = useState<any[]>([]);
+    const [isExtending, setIsExtending] = useState(false);
+    const [extendDuration, setExtendDuration] = useState(1);
+    const [showPayment, setShowPayment] = useState(false);
 
     useEffect(() => {
         const loadData = async () => {
@@ -38,6 +42,26 @@ const UserDashboardPage = () => {
         const interval = setInterval(loadData, 5000);
         return () => clearInterval(interval);
     }, []);
+
+    const handleExtendConfirm = async () => {
+        setIsExtending(false);
+        setShowPayment(true);
+    };
+
+    const handlePaymentSuccess = async () => {
+        try {
+            await extendBooking(activeBooking.id, extendDuration);
+            setShowPayment(false);
+            // Reload data
+            const dashboardData = await fetchDashboardStats();
+            setStats(dashboardData.stats);
+            setActiveBooking(dashboardData.activeBooking);
+            alert('Booking extended successfully!');
+        } catch (err: any) {
+            console.error("Extension failed", err);
+            alert(`Extension failed: ${err.message}`);
+        }
+    };
 
     return (
         <div className="flex min-h-screen bg-black font-sans text-gray-200">
@@ -99,7 +123,14 @@ const UserDashboardPage = () => {
                                         {activeBooking.status.replace('_', ' ')}
                                     </div>
                                     <h3 className="text-3xl font-bold text-white mb-2">Slot <span className="text-blue-400">{activeBooking.slotNumber}</span></h3>
-                                    <p className="text-gray-300 max-w-lg">Plate: <span className="font-mono text-white">{activeBooking.carNumber}</span></p>
+                                    <p className="text-gray-300 max-w-lg mb-4">Plate: <span className="font-mono text-white">{activeBooking.carNumber}</span></p>
+
+                                    <button
+                                        onClick={() => setIsExtending(true)}
+                                        className="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-bold shadow-lg shadow-blue-900/40 transition transform active:scale-95"
+                                    >
+                                        Extend Time
+                                    </button>
                                 </div>
 
                                 <div className="text-center md:text-right bg-black/30 p-6 rounded-2xl border border-white/5 backdrop-blur-md">
@@ -133,6 +164,51 @@ const UserDashboardPage = () => {
                     </section>
                 </main>
             </div>
+
+            {/* Extension Modal */}
+            {isExtending && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+                    <div className="bg-gray-900 border border-gray-800 p-8 rounded-3xl w-full max-w-md shadow-2xl relative">
+                        <h2 className="text-2xl font-bold text-white mb-6">Extend Your Session</h2>
+
+                        <div className="mb-8">
+                            <label className="block text-gray-400 font-medium mb-4">Additional Hours</label>
+                            <input
+                                type="range"
+                                min="1"
+                                max="6"
+                                value={extendDuration}
+                                onChange={(e) => setExtendDuration(parseInt(e.target.value))}
+                                className="w-full h-3 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                            />
+                            <div className="flex justify-between mt-4 text-gray-500 font-mono">
+                                <span>1h</span>
+                                <span className="text-blue-400 font-bold text-xl">{extendDuration} Hours</span>
+                                <span>6h</span>
+                            </div>
+                        </div>
+
+                        <div className="bg-black/40 p-5 rounded-2xl border border-white/5 flex justify-between items-center mb-8">
+                            <span className="text-gray-400">Extra Cost</span>
+                            <span className="text-3xl font-bold text-white">₹{extendDuration * 50}</span>
+                        </div>
+
+                        <div className="flex space-x-4">
+                            <button onClick={() => setIsExtending(false)} className="flex-1 py-3 border border-gray-700 text-gray-400 rounded-xl hover:bg-gray-800 transition">Cancel</button>
+                            <button onClick={handleExtendConfirm} className="flex-1 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-500 font-bold shadow-lg">Confirm</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Payment Modal for Extension */}
+            {showPayment && (
+                <PaymentModal
+                    amount={extendDuration * 50}
+                    onSuccess={handlePaymentSuccess}
+                    onCancel={() => setShowPayment(false)}
+                />
+            )}
         </div>
     );
 };

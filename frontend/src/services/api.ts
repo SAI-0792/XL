@@ -65,4 +65,9 @@ export const checkEntry = async (carNumber: string) => {
     return response.data;
 };
 
+export const extendBooking = async (bookingId: string, additionalHours: number) => {
+    const response = await api.post(`/bookings/${bookingId}/extend`, { additionalHours });
+    return response.data;
+};
+
 export default api;
