@@ -32,16 +32,17 @@ const io = new Server(server, {
 app.set('io', io);
 setupSocket(io);
 
-// Connect DB and Start
+// Connect DB
 mongoose.connect(MONGO_URI)
   .then(() => {
     console.log('Connected to MongoDB');
-    console.log('Connected to MongoDB');
-    server.listen(PORT, '0.0.0.0', () => {
-      console.log(`Server running on port ${PORT}`);
-      setupCronJobs();
-    });
+    setupCronJobs();
   })
   .catch((err) => {
     console.error('MongoDB Connection Error:', err);
   });
+
+// Start Server immediately (Render needs open port)
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running on port ${PORT}`);
+});
