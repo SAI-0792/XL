@@ -100,29 +100,37 @@ export const createBooking = async (
 };
 
 export const handlePlateRecognition = async (plateNumber: string, gateId: string) => {
-    console.log(`Plate detected: ${plateNumber} at ${gateId}`);
+    // Normalize: remove spaces, dashes, dots — "AP 07 TA 4050" becomes "AP07TA4050"
+    const normalizedPlate = plateNumber.toUpperCase().replace(/[\s\-\.]/g, '').trim();
+    console.log(`Plate detected: "${plateNumber}" -> Normalized: "${normalizedPlate}" at ${gateId}`);
 
-    // Find pending booking for this car
-    const booking = await Booking.findOne({
-        carNumber: plateNumber,
-        status: 'PENDING_ARRIVAL',
-        bufferExpiry: { $gt: new Date() } // Not expired
+    // Find ALL pending bookings and match by normalized plate
+    const pendingBookings = await Booking.find({
+        status: 'PENDING_ARRIVAL'
     });
 
-    if (booking) {
-        console.log(`Matched booking ${booking._id} for plate ${plateNumber}`);
-        booking.status = 'ACTIVE';
-        booking.actualStartTime = new Date();
-        booking.actualEndTime = undefined; // Clear if any
-        await booking.save();
+    let matchedBooking = null;
+    for (const booking of pendingBookings) {
+        const bookingPlate = booking.carNumber.toUpperCase().replace(/[\s\-\.]/g, '').trim();
+        if (bookingPlate === normalizedPlate) {
+            matchedBooking = booking;
+            break;
+        }
+    }
+
+    if (matchedBooking) {
+        console.log(`✅ Matched booking ${matchedBooking._id} for plate ${normalizedPlate}`);
+        matchedBooking.status = 'ACTIVE';
+        matchedBooking.actualStartTime = new Date();
+        matchedBooking.actualEndTime = undefined;
+        await matchedBooking.save();
 
         // Update slot status to OCCUPIED
-        await ParkingSlot.findByIdAndUpdate(booking.slotId, { status: 'OCCUPIED' });
+        await ParkingSlot.findByIdAndUpdate(matchedBooking.slotId, { status: 'OCCUPIED' });
 
-        return { matched: true, bookingId: booking._id };
+        return { matched: true, bookingId: matchedBooking._id };
     } else {
-        // Maybe check if it's an exit event? 
-        // For now assuming entry only implementation as per prompt focus
+        console.log(`No pending booking found for plate: ${normalizedPlate}`);
         return { matched: false };
     }
 };
