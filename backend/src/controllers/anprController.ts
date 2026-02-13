@@ -26,9 +26,11 @@ export const scanLicensePlate = async (req: Request & { file?: Express.Multer.Fi
         const processedBuffer = await image.getBufferAsync(Jimp.MIME_JPEG);
 
         // Perform OCR with Whitelist on PROCESSED image
+        // PSM 7: Treat the image as a single text line.
         const { data: { text } } = await Tesseract.recognize(processedBuffer, 'eng', {
             logger: (m: any) => console.log(m),
-            tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+            tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
+            tessedit_pageseg_mode: '7',
         } as any);
 
         // Improved ANPR for Indian License Plates
@@ -36,44 +38,56 @@ export const scanLicensePlate = async (req: Request & { file?: Express.Multer.Fi
 
         // Helper function to extract and standardise plate
         const extractIndianPlate = (input: string): string | null => {
-            // Remove all whitespace for processing
-            const str = input.replace(/\s+/g, '');
+            // Remove all whitespace
+            const str = input.replace(/[\s\W_]+/g, '').toUpperCase();
 
-            // Regex for standard Indian format: 
-            // 2 Chars (State) + 2 Digits (District) + 1-2 Chars (Series) + 4 Digits (Number)
-            // Example: AP 07 TA 4050
-            const strictRegex = /([A-Z]{2})([0-9]{2})([A-Z]{1,2})([0-9]{4})/;
+            console.log("Processing cleaned text:", str);
 
-            // Attempt strict match first
-            const match = str.match(strictRegex);
-            if (match) return match[0];
+            // Dictionary for Position-Based Correction
+            // If we expect a Number but see a Letter, map it
+            const letterToNum: Record<string, string> = { 'O': '0', 'I': '1', 'L': '1', 'Z': '2', 'S': '5', 'B': '8', 'G': '6', 'A': '4' };
+            // If we expect a Letter but see a Number, map it
+            const numToLetter: Record<string, string> = { '0': 'O', '1': 'I', '2': 'Z', '5': 'S', '8': 'B', '6': 'G', '4': 'A' };
 
-            // Fuzzy heuristic: Try to fix common OCR errors if pattern is close
-            // Look for a sequence of 9-10 chars
-            // Check for State Code pattern at start
-            // Allow 0/O confusion, S/5 confusion, etc.
+            // We look for a sequence of 10 characters that MIGHT be a plate
+            // Standard: LL NN LL NNNN (Total 10)
 
-            // Simple heuristic updates:
-            // 1. Look for 4 digits at the end
-            const potentialMatches = str.match(/[A-Z0-9]{9,10}/g);
-            if (!potentialMatches) return null;
+            // Search based on length of 10 chars
+            for (let i = 0; i <= str.length - 10; i++) {
+                const sub = str.substring(i, i + 10);
 
-            for (const candidate of potentialMatches) {
-                // Try to force format LLNNLLNNNN
-                // Fix Number part (last 4 chars) -> replace O with 0, I with 1, etc.
-                const last4 = candidate.slice(-4).replace(/O/g, '0').replace(/I/g, '1').replace(/S/g, '5');
+                // Character by Character Validation & Correction
+                let corrected = '';
 
-                // Fix District part (chars 2-4) -> usually numbers
-                // ... this is complex to do perfectly without more code.
+                // Slots 0,1: State Code (Letters)
+                corrected += (numToLetter[sub[0]] || sub[0]);
+                corrected += (numToLetter[sub[1]] || sub[1]);
 
-                // Basic: Check if it starts with valid letters
-                if (/^[A-Z]{2}/.test(candidate)) {
-                    // Return the candidate with fixed last 4 digits at least
-                    return candidate.slice(0, -4) + last4;
+                // Slots 2,3: District Code (Numbers)
+                corrected += (letterToNum[sub[2]] || sub[2]);
+                corrected += (letterToNum[sub[3]] || sub[3]);
+
+                // Slots 4,5: Series (Letters) - note: sometimes it's 1 char, but standard is usually 2 or empty. 
+                // Let's assume standard full format for now.
+                corrected += (numToLetter[sub[4]] || sub[4]);
+                corrected += (numToLetter[sub[5]] || sub[5]);
+
+                // Slots 6,7,8,9: Number (Numbers)
+                corrected += (letterToNum[sub[6]] || sub[6]);
+                corrected += (letterToNum[sub[7]] || sub[7]);
+                corrected += (letterToNum[sub[8]] || sub[8]);
+                corrected += (letterToNum[sub[9]] || sub[9]);
+
+                // Validate the Corrected String matches Strict Regex
+                // Regex: ^[A-Z]{2}[0-9]{2}[A-Z]{2}[0-9]{4}$
+                if (/^[A-Z]{2}[0-9]{2}[A-Z]{2}[0-9]{4}$/.test(corrected)) {
+                    return corrected;
                 }
             }
 
-            return null;
+            // Fallback: Try regex on original strict match if above failed (e.g. different spaced format)
+            const strictMatch = str.match(/[A-Z]{2}[0-9]{2}[A-Z]{2}[0-9]{4}/);
+            return strictMatch ? strictMatch[0] : null;
         };
 
         const detectedPlate = extractIndianPlate(cleanText) || cleanText.replace(/[^A-Z0-9]/g, '');
