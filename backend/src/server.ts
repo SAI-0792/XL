@@ -8,6 +8,15 @@ import { setupSocket } from './services/socketService';
 
 dotenv.config();
 
+console.log('Starting Server...');
+console.log('PORT:', process.env.PORT);
+console.log('MONGO_URI exists:', !!process.env.MONGO_URI);
+if (process.env.MONGO_URI) {
+  console.log('MONGO_URI starts with:', process.env.MONGO_URI.substring(0, 15) + '...');
+} else {
+  console.error('CRITICAL: MONGO_URI is not defined! Falling back to localhost.');
+}
+
 const PORT = Number(process.env.PORT) || 5000;
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/smart-parking';
 
