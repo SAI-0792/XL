@@ -14,7 +14,7 @@ export const scanLicensePlate = async (req: Request & { file?: Express.Multer.Fi
 
         console.log(`Analyzing image with Gemini API...`);
 
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
         // Convert buffer to base64
         const base64Image = req.file.buffer.toString('base64');
