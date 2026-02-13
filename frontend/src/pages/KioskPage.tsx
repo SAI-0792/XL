@@ -17,7 +17,11 @@ const KioskPage = () => {
     useEffect(() => {
         const socketUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
         // @ts-ignore
-        const socket = io(socketUrl);
+        const socket = io(socketUrl, {
+            transports: ['polling', 'websocket'],
+            reconnectionAttempts: Infinity,
+            reconnectionDelay: 1000
+        });
 
         socket.on('connect', () => {
             console.log('Kiosk connected to socket server');

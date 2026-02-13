@@ -14,7 +14,11 @@ const KioskDisplayPage = () => {
     const [isConnected, setIsConnected] = useState(false);
 
     useEffect(() => {
-        const socket = io(SOCKET_URL);
+        const socket = io(SOCKET_URL, {
+            transports: ['polling', 'websocket'], // Polling first for Render compatibility
+            reconnectionAttempts: Infinity,
+            reconnectionDelay: 1000
+        });
 
         socket.on('connect', () => {
             console.log('Connected to socket server');
