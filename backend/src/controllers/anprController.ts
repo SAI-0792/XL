@@ -1,8 +1,80 @@
 import { Request, Response } from 'express';
 import { Server } from 'socket.io';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import https from 'https';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+// OCR.space API - Free, accurate, 25,000 requests/month
+const OCR_API_KEY = process.env.OCR_SPACE_KEY || 'K85833588388957'; // Free demo key as fallback
+
+function callOCRSpace(imageBuffer: Buffer, mimeType: string): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const base64Image = `data:${mimeType};base64,${imageBuffer.toString('base64')}`;
+
+        const postData = `apikey=${OCR_API_KEY}&base64Image=${encodeURIComponent(base64Image)}&language=eng&isOverlayRequired=false&detectOrientation=true&scale=true&OCREngine=2`;
+
+        const options = {
+            hostname: 'api.ocr.space',
+            port: 443,
+            path: '/parse/image',
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Content-Length': Buffer.byteLength(postData)
+            }
+        };
+
+        const req = https.request(options, (res) => {
+            let data = '';
+            res.on('data', (chunk) => { data += chunk; });
+            res.on('end', () => {
+                try {
+                    const parsed = JSON.parse(data);
+                    if (parsed.ParsedResults && parsed.ParsedResults.length > 0) {
+                        const text = parsed.ParsedResults[0].ParsedText || '';
+                        resolve(text);
+                    } else {
+                        resolve('');
+                    }
+                } catch (e) {
+                    reject(e);
+                }
+            });
+        });
+
+        req.on('error', reject);
+        req.write(postData);
+        req.end();
+    });
+}
+
+function extractPlate(rawText: string): string | null {
+    // Clean up OCR text
+    const cleaned = rawText.toUpperCase().replace(/[^A-Z0-9\n]/g, '');
+    console.log(`OCR.space Raw: "${rawText.trim()}" -> Cleaned: "${cleaned}"`);
+
+    // Indian License Plate pattern: XX00XX0000
+    const platePattern = /[A-Z]{2}\d{1,2}[A-Z]{1,3}\d{3,4}/;
+    const match = cleaned.match(platePattern);
+
+    if (match) {
+        return match[0];
+    }
+
+    // Try each line separately
+    const lines = cleaned.split('\n').filter(l => l.length > 0);
+    for (const line of lines) {
+        const lineMatch = line.match(platePattern);
+        if (lineMatch) return lineMatch[0];
+
+        // Fallback: any 6-12 char alphanumeric string with both letters and numbers
+        if (line.length >= 6 && line.length <= 12) {
+            if (/[A-Z]/.test(line) && /\d/.test(line)) {
+                return line;
+            }
+        }
+    }
+
+    return null;
+}
 
 export const scanLicensePlate = async (req: Request & { file?: Express.Multer.File }, res: Response) => {
     try {
@@ -12,45 +84,21 @@ export const scanLicensePlate = async (req: Request & { file?: Express.Multer.Fi
             return res.status(400).json({ error: 'No image uploaded' });
         }
 
-        console.log(`Analyzing image with Gemini API...`);
+        console.log(`Analyzing image with OCR.space...`);
 
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-
-        // Convert buffer to base64
-        const base64Image = req.file.buffer.toString('base64');
         const mimeType = req.file.mimetype || 'image/jpeg';
+        const rawText = await callOCRSpace(req.file.buffer, mimeType);
 
-        const prompt = `You are a license plate recognition system. Look at this image and extract ANY text that appears to be a vehicle license plate number. 
-Rules:
-- Return ONLY the plate number, nothing else
-- Remove spaces and special characters 
-- If you see an Indian plate like "AP 07 TA 4050", return "AP07TA4050"
-- If you cannot find a license plate, return exactly "NONE"
-- Do NOT add any explanation, just the plate text`;
+        const plateText = extractPlate(rawText);
 
-        const result = await model.generateContent([
-            prompt,
-            {
-                inlineData: {
-                    data: base64Image,
-                    mimeType: mimeType
-                }
-            }
-        ]);
-
-        const response = await result.response;
-        const detectedText = response.text().trim().replace(/\s+/g, '');
-
-        console.log(`Gemini Raw Response: "${detectedText}"`);
-
-        if (detectedText && detectedText !== 'NONE' && detectedText.length >= 4) {
+        if (plateText && plateText.length >= 4) {
             const plateData = {
-                plateNumber: detectedText,
+                plateNumber: plateText,
                 timestamp: new Date(),
-                rawText: detectedText
+                rawText: rawText.trim()
             };
 
-            console.log("Gemini Detected:", plateData.plateNumber);
+            console.log("✅ Detected:", plateData.plateNumber);
 
             // Emit to Kiosk via Socket.io
             const io: Server = req.app.get('io');
@@ -60,18 +108,12 @@ Rules:
 
             return res.json({ success: true, data: plateData });
         } else {
-            console.warn("Gemini: No valid plate found.");
-            return res.status(422).json({ error: 'No license plate detected' });
+            console.warn("No valid plate found. Raw:", rawText.trim());
+            return res.status(422).json({ error: 'No license plate detected', rawText: rawText.trim() });
         }
 
     } catch (error: any) {
         console.error('ANPR Controller Error:', error.message || error);
-
-        // Handle rate limiting specifically
-        if (error.status === 429) {
-            return res.status(429).json({ error: 'Rate limited, please wait and try again' });
-        }
-
         res.status(500).json({ error: 'Internal Server Error' });
     }
 };
