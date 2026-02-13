@@ -104,13 +104,13 @@ export const handlePlateRecognition = async (plateNumber: string, gateId: string
     const normalizedPlate = plateNumber.toUpperCase().replace(/[\s\-\.]/g, '').trim();
     console.log(`Plate detected: "${plateNumber}" -> Normalized: "${normalizedPlate}" at ${gateId}`);
 
-    // Find ALL pending bookings and match by normalized plate
-    const pendingBookings = await Booking.find({
-        status: 'PENDING_ARRIVAL'
+    // Find ALL active/pending bookings and match by normalized plate
+    const bookings = await Booking.find({
+        status: { $in: ['PENDING_ARRIVAL', 'ACTIVE'] }
     });
 
     let matchedBooking = null;
-    for (const booking of pendingBookings) {
+    for (const booking of bookings) {
         const bookingPlate = booking.carNumber.toUpperCase().replace(/[\s\-\.]/g, '').trim();
         if (bookingPlate === normalizedPlate) {
             matchedBooking = booking;
@@ -119,7 +119,14 @@ export const handlePlateRecognition = async (plateNumber: string, gateId: string
     }
 
     if (matchedBooking) {
-        console.log(`✅ Matched booking ${matchedBooking._id} for plate ${normalizedPlate}`);
+        if (matchedBooking.status === 'ACTIVE') {
+            // Already checked in — don't create a new booking
+            console.log(`✅ Vehicle ${normalizedPlate} already has ACTIVE booking ${matchedBooking._id}`);
+            return { matched: true, alreadyActive: true, bookingId: matchedBooking._id };
+        }
+
+        // PENDING_ARRIVAL → Activate it
+        console.log(`✅ Matched PENDING booking ${matchedBooking._id} for plate ${normalizedPlate}`);
         matchedBooking.status = 'ACTIVE';
         matchedBooking.actualStartTime = new Date();
         matchedBooking.actualEndTime = undefined;
@@ -130,7 +137,7 @@ export const handlePlateRecognition = async (plateNumber: string, gateId: string
 
         return { matched: true, bookingId: matchedBooking._id };
     } else {
-        console.log(`No pending booking found for plate: ${normalizedPlate}`);
+        console.log(`No booking found for plate: ${normalizedPlate}`);
         return { matched: false };
     }
 };

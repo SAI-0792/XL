@@ -62,7 +62,7 @@ const KioskPage = () => {
             console.log("Checking entry for:", plateToCheck);
             const result = await checkEntry(plateToCheck);
             if (result.matched) {
-                // Existing booking found!
+                // Existing booking found — grant entry
                 setStep('ENTRY_GRANTED');
                 setTimeout(() => {
                     setStep('DETECTING');
@@ -70,13 +70,13 @@ const KioskPage = () => {
                     setVehicleType(null);
                 }, 5000);
             } else {
-                alert('No existing booking found for this plate.');
-                setStep('SELECT_VEHICLE'); // Proceed to vehicle selection if no booking found
+                // No booking at all — let them create one at kiosk
+                setStep('SELECT_VEHICLE');
             }
         } catch (error: any) {
             console.error("Entry check failed", error);
-            alert('Error checking entry status');
-            setStep('SELECT_VEHICLE'); // Fallback to vehicle selection on error
+            // On error, still let them proceed to create a booking
+            setStep('SELECT_VEHICLE');
         }
     };
 
