@@ -12,8 +12,21 @@ def extract_plate(image_path):
         model_dir = os.path.join(os.path.dirname(__file__), 'easyocr_model')
         reader = easyocr.Reader(['en'], gpu=False, model_storage_directory=model_dir, download_enabled=False)
         
-        # Read the image
-        result = reader.readtext(image_path)
+        import cv2
+
+        # Read the image using OpenCV for resizing
+        img = cv2.imread(image_path)
+        if img is None:
+             raise ValueError("Could not read image")
+        
+        # Resize if too large (speed up OCR on free tier)
+        height, width = img.shape[:2]
+        if width > 800:
+             scale = 800 / width
+             img = cv2.resize(img, (int(width * scale), int(height * scale)))
+        
+        # Read the text from numpy array
+        result = reader.readtext(img)
         
         detected_text = []
         best_plate = ""

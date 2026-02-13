@@ -31,12 +31,16 @@ export const scanLicensePlate = async (req: Request & { file?: Express.Multer.Fi
         let errorData = '';
 
         pythonProcess.stdout.on('data', (data) => {
+            console.log(`Python Output Chunk: ${data.toString()}`);
             resultData += data.toString();
         });
 
         pythonProcess.stderr.on('data', (data) => {
             errorData += data.toString();
-            console.error(`Python stderr: ${data}`);
+            // Don't log "Using CPU" as error, it's just info
+            if (!data.toString().includes("Using CPU")) {
+                console.error(`Python stderr: ${data}`);
+            }
         });
 
         pythonProcess.on('close', (code) => {
