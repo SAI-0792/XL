@@ -11,10 +11,11 @@ export const scanLicensePlate = async (req: Request & { file?: Express.Multer.Fi
 
         const imageBuffer = req.file.buffer;
 
-        // Perform OCR
+        // Perform OCR with Whitelist
         const { data: { text } } = await Tesseract.recognize(imageBuffer, 'eng', {
-            // logger: m => console.log(m) // Optional: logging
-        });
+            logger: m => console.log(m),
+            tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+        } as any);
 
         // Improved ANPR for Indian License Plates
         const cleanText = text.replace(/[^a-zA-Z0-9\s]/g, '').toUpperCase();
