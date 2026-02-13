@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import io from 'socket.io-client';
 import SlotMap from '../components/SlotMap';
 import PaymentModal from '../components/PaymentModal';
 import { fetchSlots, createBooking, checkEntry } from '../services/api';
@@ -12,23 +13,27 @@ const KioskPage = () => {
     const [showPayment, setShowPayment] = useState(false);
     const [slots, setSlots] = useState<any[]>([]);
 
-    // Mock plate detection simulation
+    // Socket.io Connection for Real-time Plate Detection
     useEffect(() => {
-        let timer: any;
-        if (step === 'DETECTING') {
-            timer = setTimeout(() => {
-                // Generate random plate: KA + 2 digits + 2 chars + 4 digits
-                const r = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
-                const char = () => String.fromCharCode(r(65, 90));
-                const randomPlate = `KA${r(10, 99)}${char()}${char()}${r(1000, 9999)}`;
+        const socketUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+        // @ts-ignore
+        const socket = io(socketUrl);
 
-                setDetectedPlate(randomPlate);
-                // Automatically check for existing booking after detection
-                // This will either go to ENTRY_GRANTED or SELECT_VEHICLE
-                handleVerifyPlate(randomPlate);
-            }, 3500);
-        }
-        return () => clearTimeout(timer);
+        socket.on('connect', () => {
+            console.log('Kiosk connected to socket server');
+        });
+
+        socket.on('plate_detected', (data: { plateNumber: string }) => {
+            console.log('Real Plate Detected:', data.plateNumber);
+            if (step === 'DETECTING') {
+                setDetectedPlate(data.plateNumber);
+                handleVerifyPlate(data.plateNumber);
+            }
+        });
+
+        return () => {
+            socket.disconnect();
+        };
     }, [step]);
 
 
