@@ -23,8 +23,16 @@ export const scanLicensePlate = async (req: Request & { file?: Express.Multer.Fi
 
         console.log(`Analyzing image with EasyOCR: ${tempFilePath}`);
 
+        // Determine Python executable path
+        // In Docker (Render), we installed dependencies in /opt/venv
+        let pythonPath = 'python3';
+        if (fs.existsSync('/opt/venv/bin/python3')) {
+            pythonPath = '/opt/venv/bin/python3';
+            console.log("Using Virtualenv Python:", pythonPath);
+        }
+
         // Spawn Python process
-        const pythonProcess = spawn('python3', ['src/ocr_engine.py', tempFilePath]);
+        const pythonProcess = spawn(pythonPath, ['src/ocr_engine.py', tempFilePath]);
 
         let resultData = '';
         let errorData = '';
