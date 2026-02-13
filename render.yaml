@@ -1,8 +1,10 @@
-services:
   - type: web
     name: xl-backend
-    env: docker
-    dockerfilePath: ./backend/Dockerfile
+    env: node
+    # Install Python dependencies globally (user mode) or virtualenv. 
+    # Render Node image has python3. We install deps then build node app.
+    buildCommand: pip3 install -r backend/requirements.txt && cd backend && npm install && npm run build
+    startCommand: cd backend && npm start
     envVars:
       - key: PORT
         value: 10000

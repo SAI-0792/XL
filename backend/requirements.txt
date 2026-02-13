@@ -1,0 +1,4 @@
+easyocr
+opencv-python-headless
+# Install CPU-only torch to save space/memory if possible, but standard pip usually grabs full.
+# We can rely on pip caching or just hope it fits.
