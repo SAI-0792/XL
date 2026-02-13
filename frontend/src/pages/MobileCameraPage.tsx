@@ -86,7 +86,7 @@ const MobileCameraPage = () => {
                 }
             } catch (err: any) {
                 console.error("Scan Error:", err);
-                // Don't set error state usually to avoid flashing UI, just log
+                setError(err.message || "Network Error");
             }
         }, 'image/jpeg', 0.8);
     };
@@ -128,6 +128,12 @@ const MobileCameraPage = () => {
                         <p className="text-xl text-green-400 font-mono">{lastResult}</p>
                     </div>
                 )}
+
+                {/* Debug Info for Mobile */}
+                <div className="mt-8 p-4 bg-gray-900 text-xs text-gray-500 w-full max-w-md break-all">
+                    <p>API Config: {import.meta.env.VITE_API_URL || 'Using Localhost Fallback'}</p>
+                    {error && <p className="text-red-500 mt-2">Last Error: {error}</p>}
+                </div>
             </div>
         </div>
     );
