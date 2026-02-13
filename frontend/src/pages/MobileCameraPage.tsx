@@ -86,7 +86,11 @@ const MobileCameraPage = () => {
                 }
             } catch (err: any) {
                 console.error("Scan Error:", err);
-                setError(err.message || "Network Error");
+                const errorMessage = err.response
+                    ? `Server Error: ${err.response.status} - ${JSON.stringify(err.response.data)}`
+                    : `Network Error: ${err.message} (Code: ${err.code})`;
+
+                setError(errorMessage);
             }
         }, 'image/jpeg', 0.8);
     };
