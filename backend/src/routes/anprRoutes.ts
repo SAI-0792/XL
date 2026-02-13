@@ -10,6 +10,10 @@ const upload = multer({
     limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
 });
 
+router.get('/', (req, res) => {
+    res.json({ message: 'ANPR Service Ready', timestamp: new Date() });
+});
+
 router.post('/scan', upload.single('image'), scanLicensePlate);
 
 export default router;
