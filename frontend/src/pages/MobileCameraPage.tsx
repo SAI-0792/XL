@@ -46,7 +46,7 @@ const MobileCameraPage = () => {
         if (isScanning) {
             intervalId = setInterval(() => {
                 captureAndSend();
-            }, 3000); // Scan every 3 seconds to avoid overloading server
+            }, 6000); // Scan every 6 seconds to stay within Free Tier limits
         }
 
         return () => clearInterval(intervalId);

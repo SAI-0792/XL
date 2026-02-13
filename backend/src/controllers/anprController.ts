@@ -61,13 +61,65 @@ export const scanLicensePlate = async (req: Request & { file?: Express.Multer.Fi
             console.log("Gemini Raw:", rawText);
             console.log("Gemini Cleaned:", detectedPlate);
 
-        } catch (geminiError) {
+        } catch (geminiError: any) {
             console.error("Gemini API Error:", geminiError);
-            return res.status(500).json({ error: 'AI processing failed' });
+
+            // Fallback to Tesseract if Gemini fails (e.g. Rate Limit 429)
+            console.log("Falling back to Tesseract OCR due to AI Error...");
+
+            // Re-import Tesseract dynamically to avoid top-level issues if not used often
+            const Tesseract = require('tesseract.js');
+
+            const { data: { text } } = await Tesseract.recognize(processedBuffer, 'eng', {
+                logger: (m: any) => console.log(m),
+                tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
+                tessedit_pageseg_mode: '7',
+            });
+
+            rawText = text;
+            // Clean the result
+            detectedPlate = rawText.replace(/[\s\W_]+/g, '').toUpperCase();
+
+            // Indian Plate Logic (Simplified)
+            // Helper function to extract and standardise plate
+            const extractIndianPlate = (input: string): string | null => {
+                const str = input.replace(/[\s\W_]+/g, '').toUpperCase();
+                const letterToNum: Record<string, string> = { 'O': '0', 'I': '1', 'L': '1', 'Z': '2', 'S': '5', 'B': '8', 'G': '6', 'A': '4' };
+                const numToLetter: Record<string, string> = { '0': 'O', '1': 'I', '2': 'Z', '5': 'S', '8': 'B', '6': 'G', '4': 'A' };
+
+                for (let i = 0; i <= str.length - 10; i++) {
+                    const sub = str.substring(i, i + 10);
+                    let corrected = '';
+                    corrected += (numToLetter[sub[0]] || sub[0]);
+                    corrected += (numToLetter[sub[1]] || sub[1]);
+                    corrected += (letterToNum[sub[2]] || sub[2]);
+                    corrected += (letterToNum[sub[3]] || sub[3]);
+                    corrected += (numToLetter[sub[4]] || sub[4]);
+                    corrected += (numToLetter[sub[5]] || sub[5]);
+                    corrected += (letterToNum[sub[6]] || sub[6]);
+                    corrected += (letterToNum[sub[7]] || sub[7]);
+                    corrected += (letterToNum[sub[8]] || sub[8]);
+                    corrected += (letterToNum[sub[9]] || sub[9]);
+
+                    if (/^[A-Z]{2}[0-9]{2}[A-Z]{2}[0-9]{4}$/.test(corrected)) {
+                        return corrected;
+                    }
+                }
+                const strictMatch = str.match(/[A-Z]{2}[0-9]{2}[A-Z]{2}[0-9]{4}/);
+                return strictMatch ? strictMatch[0] : null;
+            };
+
+            const indianPlate = extractIndianPlate(detectedPlate);
+            if (indianPlate) {
+                detectedPlate = indianPlate;
+                console.log("Tesseract (Indian Logic):", detectedPlate);
+            } else {
+                console.log("Tesseract Raw:", detectedPlate);
+            }
         }
 
         if (!detectedPlate || detectedPlate.length < 4) {
-            return res.status(422).json({ error: 'Could not detect a valid license plate via AI', rawText: rawText });
+            return res.status(422).json({ error: 'Could not detect a valid license plate via AI or OCR', rawText: rawText });
         }
 
         const plateData = {
