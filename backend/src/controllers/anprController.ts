@@ -2,8 +2,9 @@ import { Request, Response } from 'express';
 import Tesseract from 'tesseract.js';
 import { Server } from 'socket.io';
 
-export const scanLicensePlate = async (req: Request, res: Response) => {
+export const scanLicensePlate = async (req: Request & { file?: Express.Multer.File }, res: Response) => {
     try {
+        // @ts-ignore
         if (!req.file) {
             return res.status(400).json({ error: 'No image uploaded' });
         }
