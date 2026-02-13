@@ -51,12 +51,22 @@ router.post('/check', async (req: any, res) => {
 router.get('/', protect, async (req: any, res) => {
     try {
         const user = await User.findById(req.user.id);
-        const validPlates = (user?.managedCars || []).filter(p => typeof p === 'string' && p.trim().length > 0);
+        const rawPlates = (user?.managedCars || []).filter(p => typeof p === 'string' && p.trim().length > 0);
+
+        // Create both raw and normalized versions for matching
+        const allPlateVariants: string[] = [];
+        for (const plate of rawPlates) {
+            allPlateVariants.push(plate);
+            const normalized = plate.toUpperCase().replace(/[\s\-\.]/g, '').trim();
+            if (!allPlateVariants.includes(normalized)) {
+                allPlateVariants.push(normalized);
+            }
+        }
 
         const bookings = await Booking.find({
             $or: [
                 { userId: req.user.id },
-                { userId: { $in: [null, undefined] }, carNumber: { $in: validPlates } }
+                { userId: { $in: [null, undefined] }, carNumber: { $in: allPlateVariants } }
             ]
         }).populate('slotId').sort({ createdAt: -1 });
 

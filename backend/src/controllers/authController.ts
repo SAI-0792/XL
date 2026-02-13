@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
 import User from '../models/User';
+import Booking from '../models/Booking';
 
 const generateToken = (id: string, role: string) => {
     return jwt.sign({ id, role }, process.env.JWT_SECRET || 'default_secret', {
@@ -51,6 +52,25 @@ export const registerUser = async (req: Request, res: Response) => {
             vehicles
             // managedCars will be auto-synced by the pre-save middleware
         });
+
+        // Retroactively link existing kiosk bookings (userId=null) to this new user
+        if (plateNumber && user) {
+            const normalizedPlate = plateNumber.toUpperCase().replace(/[\s\-\.]/g, '').trim();
+            const originalPlate = plateNumber.toUpperCase().trim();
+
+            const linkedCount = await Booking.updateMany(
+                {
+                    userId: { $in: [null, undefined] },
+                    carNumber: { $in: [normalizedPlate, originalPlate] },
+                    status: { $in: ['PENDING_ARRIVAL', 'ACTIVE'] }
+                },
+                { $set: { userId: user._id } }
+            );
+
+            if (linkedCount.modifiedCount > 0) {
+                console.log(`✅ Linked ${linkedCount.modifiedCount} existing kiosk bookings to new user ${user._id}`);
+            }
+        }
 
         if (user) {
             console.log('User created successfully:', user._id);
