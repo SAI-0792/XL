@@ -23,7 +23,8 @@ export const scanLicensePlate = async (req: Request & { file?: Express.Multer.Fi
 
         console.log(`Analyzing image with EasyOCR: ${tempFilePath}`);
 
-        // Spawn Python process (System Python in Render Node env)
+        // Spawn Python process
+        // Dockerfile installs deps globally for system python
         const pythonProcess = spawn('python3', ['src/ocr_engine.py', tempFilePath]);
 
         let resultData = '';

@@ -10,16 +10,9 @@ RUN apt-get update && apt-get install -y \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-# Create a virtual environment for Python to avoid permission issues
-ENV VIRTUAL_ENV=/opt/venv
-RUN python3 -m venv $VIRTUAL_ENV
-ENV PATH="$VIRTUAL_ENV/bin:$PATH"
-
-# Install Python dependencies
-# torch --extra-index-url specific for CPU version to default to smaller build if possible, 
-# but simply pip installing easyocr usually pulls in torch. 
-# We explicitly install easyocr and opencv-python-headless.
-RUN pip3 install --no-cache-dir easyocr opencv-python-headless
+# Install Python dependencies globally
+# We use --break-system-packages because in Docker it is fine (isolated env)
+RUN pip3 install --no-cache-dir --break-system-packages easyocr opencv-python-headless
 
 # Create App Directory
 WORKDIR /app
