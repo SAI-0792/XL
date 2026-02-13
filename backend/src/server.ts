@@ -17,7 +17,7 @@ if (process.env.MONGO_URI) {
   console.error('CRITICAL: MONGO_URI is not defined! Falling back to localhost.');
 }
 
-const PORT = Number(process.env.PORT) || 5000;
+const PORT = Number(process.env.PORT) || 10000;
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/smart-parking';
 
 const server = http.createServer(app);
