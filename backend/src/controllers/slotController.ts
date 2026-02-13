@@ -71,6 +71,29 @@ export const updateSlotStatus = async (req: Request, res: Response) => {
     try {
         const { slot_id, status, distance } = req.body; // status: 'FREE' | 'OCCUPIED'
 
+        // === GATE SENSOR (slot_id 3) — NOT a real slot ===
+        if (String(slot_id) === '3') {
+            console.log(`Gate sensor update: status=${status}, distance=${distance}`);
+            if (status === 'OCCUPIED') {
+                // Vehicle detected at gate — check if any active/pending booking exists
+                const activeBooking = await Booking.findOne({
+                    status: { $in: ['PENDING_ARRIVAL', 'ACTIVE'] }
+                }).sort({ updatedAt: -1 });
+
+                if (activeBooking) {
+                    console.log(`Gate: ALLOW — Booking ${activeBooking._id} found (${activeBooking.carNumber})`);
+                    return res.json({ status: 'ALLOW', booking: activeBooking._id, plate: activeBooking.carNumber });
+                } else {
+                    console.log('Gate: DENY — No active booking found');
+                    return res.json({ status: 'DENY' });
+                }
+            } else {
+                // FREE = no vehicle at gate, just acknowledge
+                return res.json({ status: 'IDLE' });
+            }
+        }
+
+        // === REGULAR PARKING SLOTS (slot_id 1, 2, A1, B1, etc.) ===
         // Map numeric ID to slotNumber (e.g., 1 -> 'A1') if necessary
         let searchCriteria: any = [
             { slotNumber: String(slot_id) },
