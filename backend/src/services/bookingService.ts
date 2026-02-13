@@ -13,18 +13,60 @@ export const createBooking = async (
     endTime: Date,
     source: 'WEB' | 'KIOSK'
 ) => {
-    // Check slot availability (Simplified)
+    // Prevent past bookings (allow 5 min cushion)
+    if (new Date(startTime).getTime() < Date.now() - 5 * 60 * 1000) {
+        throw new Error('Start time cannot be in the past');
+    }
+    // Check slot availability and time overlaps
     const slot = await ParkingSlot.findById(slotId);
-    if (!slot || slot.status !== 'AVAILABLE') {
-        throw new Error('Slot not available');
+    if (!slot) {
+        throw new Error('Slot not found');
+    }
+
+    // Check for existing overlapping bookings on this slot
+    const overlappingBooking = await Booking.findOne({
+        slotId,
+        status: { $in: ['PENDING_ARRIVAL', 'ACTIVE'] },
+        $or: [
+            {
+                startTime: { $lt: endTime },
+                endTime: { $gt: startTime }
+            }
+        ]
+    });
+
+    if (overlappingBooking) {
+        throw new Error('Slot is already booked for this time period');
+    }
+
+    // Check if the same car plate already has a booking during this time period
+    const existingCarBooking = await Booking.findOne({
+        carNumber: carNumber.toUpperCase().trim(),
+        status: { $in: ['PENDING_ARRIVAL', 'ACTIVE'] },
+        startTime: { $lt: endTime },
+        endTime: { $gt: startTime }
+    });
+
+    if (existingCarBooking) {
+        throw new Error('This vehicle already has a booking during this time period');
     }
 
     // Auto-link to user if they have an account with this plate
     let linkedUserId = userId;
     if (!linkedUserId && carNumber) {
-        const userWithPlate = await User.findOne({ managedCars: carNumber });
+        const userWithPlate = await User.findOne({ managedCars: carNumber.toUpperCase().trim() });
         if (userWithPlate) {
             linkedUserId = userWithPlate._id.toString();
+
+            // Also add vehicle to user's vehicles array if not present
+            const vehicleExists = userWithPlate.vehicles?.some(v => v.plateNumber === carNumber.toUpperCase().trim());
+            if (!vehicleExists) {
+                userWithPlate.vehicles = [
+                    ...(userWithPlate.vehicles || []),
+                    { plateNumber: carNumber.toUpperCase().trim(), type: 'CAR' } // Default to CAR type
+                ] as any;
+                await userWithPlate.save();
+            }
         }
     }
 

@@ -27,9 +27,14 @@ setupSocket(io);
 mongoose.connect(MONGO_URI)
   .then(() => {
     console.log('Connected to MongoDB');
-    server.listen(PORT, '0.0.0.0', () => {
-      console.log(`Server running on port ${PORT}`);
-      setupCronJobs(); // Start background jobs (buffer expiry)
+    console.log('Connected to MongoDB');
+    // server.listen(PORT, '0.0.0.0', () => {
+    //   console.log(`Server running on port ${PORT}`);
+    //   setupCronJobs(); // Start background jobs (buffer expiry)
+    // });
+    server.listen(3000, "0.0.0.0", () => {
+      console.log("Server running on port 3000");
+      setupCronJobs();
     });
   })
   .catch((err) => {

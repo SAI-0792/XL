@@ -10,41 +10,69 @@ const generateToken = (id: string, role: string) => {
 };
 
 export const registerUser = async (req: Request, res: Response) => {
+    console.log('Register request received:', req.body);
     try {
-        const { name, email, password, plateNumber } = req.body;
+        const { name, email, password, plateNumber, vehicleType } = req.body;
+
+        if (!name || !email || !password) {
+            console.log('Missing fields:', { name: !!name, email: !!email, password: !!password });
+            return res.status(400).json({ message: 'Please provide name, email and password' });
+        }
 
         const userExists = await User.findOne({ email });
         if (userExists) {
+            console.log('User already exists:', email);
             return res.status(400).json({ message: 'User already exists' });
+        }
+
+        // Check if plate is already registered to another user
+        if (plateNumber) {
+            const plateExists = await User.findOne({ managedCars: plateNumber });
+            if (plateExists) {
+                console.log('Plate already registered to another user:', plateNumber);
+                return res.status(400).json({ message: 'Car plate is already registered to another account' });
+            }
         }
 
         const salt = await bcrypt.genSalt(10);
         const passwordHash = await bcrypt.hash(password, salt);
 
-        const matchCars = plateNumber ? [plateNumber] : [];
+        // Create vehicles array with proper type
+        const vehicles = plateNumber ? [{
+            plateNumber: plateNumber.toUpperCase().trim(),
+            type: vehicleType || 'CAR'
+        }] : [];
 
+        console.log('Creating user...');
         const user = await User.create({
             name,
             email,
             passwordHash,
-            managedCars: matchCars
+            vehicles
+            // managedCars will be auto-synced by the pre-save middleware
         });
 
         if (user) {
+            console.log('User created successfully:', user._id);
             res.status(201).json({
                 _id: user._id,
                 name: user.name,
                 email: user.email,
                 role: user.role,
-                token: generateToken(user._id, user.role),
+                vehicles: user.vehicles,
+                vehicleType: user.vehicles && user.vehicles.length > 0 ? user.vehicles[0].type : 'CAR',
+                token: generateToken(user._id as string, user.role),
             });
         } else {
+            console.log('User creation returned null');
             res.status(400).json({ message: 'Invalid user data' });
         }
     } catch (error: any) {
+        console.error('Registration error:', error);
         res.status(500).json({ message: error.message });
     }
 };
+
 
 export const loginUser = async (req: Request, res: Response) => {
     console.log('Login request received:', req.body.email); // LOG 1
@@ -72,6 +100,8 @@ export const loginUser = async (req: Request, res: Response) => {
                 name: user.name,
                 email: user.email,
                 role: user.role,
+                vehicles: user.vehicles,
+                vehicleType: user.vehicles && user.vehicles.length > 0 ? user.vehicles[0].type : 'CAR',
                 token: token,
             });
         } else {

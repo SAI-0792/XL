@@ -10,6 +10,7 @@ export interface Slot {
     _id: string;
     slotNumber: string;
     status: 'AVAILABLE' | 'OCCUPIED' | 'RESERVED';
+    type: 'CAR' | 'BIKE' | 'TRUCK' | 'HANDICAPPED';
     zone?: string;
 }
 

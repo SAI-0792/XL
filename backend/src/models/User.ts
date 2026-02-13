@@ -1,15 +1,28 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
+export interface IVehicle {
+    plateNumber: string;
+    type: 'CAR' | 'BIKE' | 'TRUCK';
+    nickname?: string; // e.g., "My Honda", "Office Bike"
+}
+
 export interface IUser extends Document {
     name: string;
     email: string;
     phone?: string;
     passwordHash: string;
     role: 'USER' | 'ADMIN';
-    managedCars: string[]; // Simple array of plate numbers for easier lookup, or link to Car model
+    vehicles: IVehicle[]; // New: array of vehicles with type and plate
+    managedCars: string[]; // Legacy: kept for backward compatibility with queries
     resetPasswordToken?: string;
     resetPasswordExpire?: Date;
 }
+
+const VehicleSchema = new Schema({
+    plateNumber: { type: String, required: true },
+    type: { type: String, enum: ['CAR', 'BIKE', 'TRUCK'], required: true },
+    nickname: { type: String }
+}, { _id: true });
 
 const UserSchema: Schema = new Schema({
     name: { type: String, required: true },
@@ -17,9 +30,19 @@ const UserSchema: Schema = new Schema({
     phone: { type: String },
     passwordHash: { type: String, required: true },
     role: { type: String, enum: ['USER', 'ADMIN'], default: 'USER' },
-    managedCars: [{ type: String }], // Store plates directly for simplicity in Phase 1
+    vehicles: { type: [VehicleSchema], default: [] },
+    managedCars: [{ type: String }], // Legacy field, kept for booking queries
+
     resetPasswordToken: { type: String },
     resetPasswordExpire: { type: Date }
 }, { timestamps: true });
+
+// Middleware to sync managedCars with vehicles array
+UserSchema.pre('save', function (next) {
+    if (this.isModified('vehicles')) {
+        this.managedCars = (this.vehicles as IVehicle[]).map(v => v.plateNumber);
+    }
+    next();
+});
 
 export default mongoose.model<IUser>('User', UserSchema);

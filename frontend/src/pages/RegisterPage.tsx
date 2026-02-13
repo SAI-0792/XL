@@ -8,6 +8,7 @@ const RegisterPage = () => {
         name: '',
         email: '',
         password: '',
+        vehicleType: 'CAR' as 'CAR' | 'BIKE' | 'TRUCK',
         carNumber: ''
     });
     const [loading, setLoading] = useState(false);
@@ -21,6 +22,7 @@ const RegisterPage = () => {
                 name: formData.name,
                 email: formData.email,
                 password: formData.password,
+                vehicleType: formData.vehicleType,
                 plateNumber: formData.carNumber // Map carNumber to plateNumber expected by backend
             });
 
@@ -34,8 +36,10 @@ const RegisterPage = () => {
             }
         } catch (error: any) {
             console.error('Registration error', error);
-            alert(`Error: ${error.message}`);
+            const message = error.response?.data?.message || error.message || 'Registration failed';
+            alert(`Error: ${message}`);
         } finally {
+
             setLoading(false);
         }
     };
@@ -86,6 +90,20 @@ const RegisterPage = () => {
                             onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                             required
                         />
+                    </div>
+
+                    <div>
+                        <label className="block text-gray-400 text-sm font-medium mb-1">Vehicle Type</label>
+                        <select
+                            className="w-full bg-black/50 border border-gray-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition"
+                            value={formData.vehicleType}
+                            onChange={(e) => setFormData({ ...formData, vehicleType: e.target.value as 'CAR' | 'BIKE' | 'TRUCK' })}
+                            required
+                        >
+                            <option value="CAR">Car</option>
+                            <option value="BIKE">Bike</option>
+                            <option value="TRUCK">Truck</option>
+                        </select>
                     </div>
 
                     <div>

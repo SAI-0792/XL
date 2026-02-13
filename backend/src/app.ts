@@ -7,6 +7,10 @@ import slotRoutes from './routes/slotRoutes';
 import userRoutes from './routes/userRoutes';
 import kioskRoutes from './routes/kioskRoutes';
 import dashboardRoutes from './routes/dashboardRoutes';
+import debugRoutes from './routes/debugRoutes';
+import adminRoutes from './routes/adminRoutes';
+import chatRoutes from './routes/chatRoutes';
+import anprRoutes from './routes/anprRoutes';
 
 const app = express();
 
@@ -22,6 +26,10 @@ app.use('/api/slots', slotRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/kiosk', kioskRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/debug', debugRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/chat', chatRoutes);
+app.use('/api/anpr', anprRoutes);
 
 // Health Check
 app.get('/', (req, res) => {

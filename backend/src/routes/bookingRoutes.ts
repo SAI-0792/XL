@@ -21,16 +21,42 @@ router.post('/', optionalProtect, async (req: any, res) => {
     }
 });
 
+// Pre-check if booking can be made (before payment)
+router.post('/check', async (req: any, res) => {
+    try {
+        const { carNumber, startTime, endTime } = req.body;
+
+        // Check if this vehicle already has a booking during this time period
+        const existingBooking = await Booking.findOne({
+            carNumber: carNumber.toUpperCase().trim(),
+            status: { $in: ['PENDING_ARRIVAL', 'ACTIVE'] },
+            startTime: { $lt: new Date(endTime) },
+            endTime: { $gt: new Date(startTime) }
+        });
+
+        if (existingBooking) {
+            return res.status(400).json({
+                available: false,
+                error: 'This vehicle already has a booking during this time period'
+            });
+        }
+
+        res.json({ available: true });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // Get User Bookings
 router.get('/', protect, async (req: any, res) => {
     try {
         const user = await User.findById(req.user.id);
-        const userPlates = user?.managedCars || [];
+        const validPlates = (user?.managedCars || []).filter(p => typeof p === 'string' && p.trim().length > 0);
 
         const bookings = await Booking.find({
             $or: [
                 { userId: req.user.id },
-                { carNumber: { $in: userPlates } }
+                { userId: { $in: [null, undefined] }, carNumber: { $in: validPlates } }
             ]
         }).populate('slotId').sort({ createdAt: -1 });
 
