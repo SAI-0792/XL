@@ -76,7 +76,12 @@ const MobileCameraPage = () => {
             formData.append('image', blob, 'capture.jpg');
 
             try {
-                const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+                let apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+                // Remove trailing slash to prevent double slashes (e.g. .com//api)
+                apiUrl = apiUrl.replace(/\/$/, '');
+
+                console.log("Sending scan to:", `${apiUrl}/api/anpr/scan`);
+
                 const response = await axios.post(`${apiUrl}/api/anpr/scan`, formData, {
                     headers: { 'Content-Type': 'multipart/form-data' }
                 });
