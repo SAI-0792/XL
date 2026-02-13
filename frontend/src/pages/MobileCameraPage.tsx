@@ -8,10 +8,10 @@ const MobileCameraPage = () => {
     const [lastResult, setLastResult] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
 
+    // Camera Setup
     useEffect(() => {
         const startCamera = async () => {
             try {
-                // Try to get back camera on mobile, or any camera on desktop
                 const stream = await navigator.mediaDevices.getUserMedia({
                     video: {
                         facingMode: 'environment', // Prefer back camera
@@ -32,7 +32,6 @@ const MobileCameraPage = () => {
         startCamera();
 
         return () => {
-            // Cleanup stream
             if (videoRef.current && videoRef.current.srcObject) {
                 const stream = videoRef.current.srcObject as MediaStream;
                 stream.getTracks().forEach(track => track.stop());
@@ -40,64 +39,83 @@ const MobileCameraPage = () => {
         };
     }, []);
 
+    // Sequential Scanning Loop (Prevents flooding)
     useEffect(() => {
-        let intervalId: ReturnType<typeof setInterval>;
+        let isActive = true;
+
+        const loop = async () => {
+            if (isScanning && isActive) {
+                await captureAndSend();
+                if (isActive && isScanning) {
+                    // Wait 2 seconds AFTER the previous request finishes
+                    // This creates a sequential queue instead of a pile-up
+                    setTimeout(loop, 2000);
+                }
+            }
+        };
 
         if (isScanning) {
-            intervalId = setInterval(() => {
-                captureAndSend();
-            }, 6000); // Scan every 6 seconds to stay within Free Tier limits
+            loop();
         }
 
-        return () => clearInterval(intervalId);
+        return () => {
+            isActive = false;
+        };
     }, [isScanning]);
 
-    const captureAndSend = () => {
+    const captureAndSend = async () => {
         if (!videoRef.current || !canvasRef.current) return;
 
         const video = videoRef.current;
         const canvas = canvasRef.current;
         const context = canvas.getContext('2d');
-
         if (!context) return;
 
-        // Set canvas dimensions to match video
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
-
-        // Draw current frame
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-        // Convert to blob
-        canvas.toBlob(async (blob) => {
-            if (!blob) return;
-
-            const formData = new FormData();
-            formData.append('image', blob, 'capture.jpg');
-
-            try {
-                let apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-                // Remove trailing slash to prevent double slashes (e.g. .com//api)
-                apiUrl = apiUrl.replace(/\/$/, '');
-
-                console.log("Sending scan to:", `${apiUrl}/api/anpr/scan`);
-
-                const response = await axios.post(`${apiUrl}/api/anpr/scan`, formData, {
-                    headers: { 'Content-Type': 'multipart/form-data' }
-                });
-
-                if (response.data.success) {
-                    setLastResult(`Detected: ${response.data.data.plateNumber}`);
+        return new Promise<void>((resolve) => {
+            canvas.toBlob(async (blob) => {
+                if (!blob) {
+                    resolve();
+                    return;
                 }
-            } catch (err: any) {
-                console.error("Scan Error:", err);
-                const errorMessage = err.response
-                    ? `Server Error: ${err.response.status} - ${JSON.stringify(err.response.data)}`
-                    : `Network Error: ${err.message} (Code: ${err.code})`;
 
-                setError(errorMessage);
-            }
-        }, 'image/jpeg', 0.8);
+                const formData = new FormData();
+                formData.append('image', blob, 'capture.jpg');
+
+                try {
+                    let apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+                    apiUrl = apiUrl.replace(/\/$/, '');
+
+                    console.log("Sending scan...");
+                    // Increased timeout to 60s because EasyOCR on free CPU is slow
+                    const response = await axios.post(`${apiUrl}/api/anpr/scan`, formData, {
+                        headers: { 'Content-Type': 'multipart/form-data' },
+                        timeout: 60000
+                    });
+
+                    if (response.data.success) {
+                        setLastResult(`Detected: ${response.data.data.plateNumber}`);
+                        setError(null);
+                    }
+                } catch (err: any) {
+                    console.error("Scan Error:", err);
+                    // Only show critical errors, ignore timeouts to avoid panic
+                    if (err.response) {
+                        setError(`Server Error: ${err.response.status}`);
+                    } else if (err.code === "ERR_NETWORK") {
+                        setError("Connection slow... retrying");
+                    } else {
+                        // Optional: show other errors
+                        // setError(err.message);
+                    }
+                } finally {
+                    resolve();
+                }
+            }, 'image/jpeg', 0.8);
+        });
     };
 
     return (
