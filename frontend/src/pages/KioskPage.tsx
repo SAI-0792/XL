@@ -13,9 +13,15 @@ const KioskPage = () => {
     const [showPayment, setShowPayment] = useState(false);
     const [slots, setSlots] = useState<any[]>([]);
 
+    // Use a ref to track step inside socket callback (avoids stale closure)
+    const stepRef = React.useRef(step);
+    useEffect(() => { stepRef.current = step; }, [step]);
+
     // Socket.io Connection for Real-time Plate Detection
+    // IMPORTANT: Connect ONCE with [] — not [step] which causes reconnects
     useEffect(() => {
         const socketUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+        console.log('Kiosk: Connecting socket to', socketUrl);
         // @ts-ignore
         const socket = io(socketUrl, {
             transports: ['polling', 'websocket'],
@@ -24,21 +30,29 @@ const KioskPage = () => {
         });
 
         socket.on('connect', () => {
-            console.log('Kiosk connected to socket server');
+            console.log('Kiosk connected to socket server, id:', socket.id);
         });
 
         socket.on('plate_detected', (data: { plateNumber: string }) => {
-            console.log('Real Plate Detected:', data.plateNumber);
-            if (step === 'DETECTING') {
+            console.log('🎯 Plate event received:', data.plateNumber, 'Current step:', stepRef.current);
+            if (stepRef.current === 'DETECTING') {
                 setDetectedPlate(data.plateNumber);
                 handleVerifyPlate(data.plateNumber);
             }
         });
 
+        socket.on('disconnect', (reason: string) => {
+            console.log('Kiosk disconnected:', reason);
+        });
+
+        socket.on('connect_error', (err: any) => {
+            console.error('Socket connection error:', err.message);
+        });
+
         return () => {
             socket.disconnect();
         };
-    }, [step]);
+    }, []); // Empty deps = connect once, never reconnect
 
 
     // Check for existing booking when plate is detected/changed
