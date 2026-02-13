@@ -16,24 +16,59 @@ export const scanLicensePlate = async (req: Request & { file?: Express.Multer.Fi
             // logger: m => console.log(m) // Optional: logging
         });
 
-        // Basic cleaning and extraction logic
-        // This is a naive implementation. Real ANPR needs specific training or constraints.
-        // We look for alphanumeric strings of length 5-10.
-        const cleanText = text.replace(/[^a-zA-Z0-9]/g, '');
+        // Improved ANPR for Indian License Plates
+        const cleanText = text.replace(/[^a-zA-Z0-9\s]/g, '').toUpperCase();
 
-        // Attempt to find a pattern resembling a plate (e.g., AA00AA0000 or similar)
-        // For now, we just take the cleaned text if it's substantial, or the raw text lines.
-        // Let's refine it to finding the longest alphanumeric sequence in the text.
+        // Helper function to extract and standardise plate
+        const extractIndianPlate = (input: string): string | null => {
+            // Remove all whitespace for processing
+            const str = input.replace(/\s+/g, '');
 
-        const potentialPlates = text.match(/[A-Z0-9]{5,15}/g) || [];
-        const bestCandidate = potentialPlates.length > 0 ? potentialPlates[0] : cleanText;
+            // Regex for standard Indian format: 
+            // 2 Chars (State) + 2 Digits (District) + 1-2 Chars (Series) + 4 Digits (Number)
+            // Example: AP 07 TA 4050
+            const strictRegex = /([A-Z]{2})([0-9]{2})([A-Z]{1,2})([0-9]{4})/;
 
-        if (!bestCandidate || bestCandidate.length < 4) {
+            // Attempt strict match first
+            const match = str.match(strictRegex);
+            if (match) return match[0];
+
+            // Fuzzy heuristic: Try to fix common OCR errors if pattern is close
+            // Look for a sequence of 9-10 chars
+            // Check for State Code pattern at start
+            // Allow 0/O confusion, S/5 confusion, etc.
+
+            // Simple heuristic updates:
+            // 1. Look for 4 digits at the end
+            const potentialMatches = str.match(/[A-Z0-9]{9,10}/g);
+            if (!potentialMatches) return null;
+
+            for (const candidate of potentialMatches) {
+                // Try to force format LLNNLLNNNN
+                // Fix Number part (last 4 chars) -> replace O with 0, I with 1, etc.
+                const last4 = candidate.slice(-4).replace(/O/g, '0').replace(/I/g, '1').replace(/S/g, '5');
+
+                // Fix District part (chars 2-4) -> usually numbers
+                // ... this is complex to do perfectly without more code.
+
+                // Basic: Check if it starts with valid letters
+                if (/^[A-Z]{2}/.test(candidate)) {
+                    // Return the candidate with fixed last 4 digits at least
+                    return candidate.slice(0, -4) + last4;
+                }
+            }
+
+            return null;
+        };
+
+        const detectedPlate = extractIndianPlate(cleanText) || cleanText.replace(/[^A-Z0-9]/g, '');
+
+        if (!detectedPlate || detectedPlate.length < 4) {
             return res.status(422).json({ error: 'Could not detect a valid license plate', rawText: text });
         }
 
         const plateData = {
-            plateNumber: bestCandidate,
+            plateNumber: detectedPlate,
             timestamp: new Date(),
             rawText: text
         };
