@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: xl-backend
+    env: node
+    root: backend
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: MONGO_URI
+        sync: false
+      - key: PORT
+        value: 10000
