@@ -103,7 +103,11 @@ export const scanLicensePlate = async (req: Request & { file?: Express.Multer.Fi
             // Emit to Kiosk via Socket.io
             const io: Server = req.app.get('io');
             if (io) {
+                const connectedSockets = io.engine?.clientsCount || 'unknown';
+                console.log(`📡 Emitting plate_detected to ${connectedSockets} connected clients`);
                 io.emit('plate_detected', plateData);
+            } else {
+                console.error("❌ Socket.io NOT available on app!");
             }
 
             return res.json({ success: true, data: plateData });
