@@ -7,7 +7,7 @@ interface PlateData {
     rawText: string;
 }
 
-const SOCKET_URL = 'http://localhost:3000';
+const SOCKET_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 const KioskDisplayPage = () => {
     const [plates, setPlates] = useState<PlateData[]>([]);
