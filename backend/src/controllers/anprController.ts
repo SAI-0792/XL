@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import Tesseract from 'tesseract.js';
 import { Server } from 'socket.io';
+import Jimp from 'jimp';
 
 export const scanLicensePlate = async (req: Request & { file?: Express.Multer.File }, res: Response) => {
     try {
@@ -9,11 +10,24 @@ export const scanLicensePlate = async (req: Request & { file?: Express.Multer.Fi
             return res.status(400).json({ error: 'No image uploaded' });
         }
 
-        const imageBuffer = req.file.buffer;
+        // Image Preprocessing with Jimp (Computer Vision techniques)
+        const image = await Jimp.read(req.file.buffer);
 
-        // Perform OCR with Whitelist
-        const { data: { text } } = await Tesseract.recognize(imageBuffer, 'eng', {
-            logger: m => console.log(m),
+        // Resize to a reasonable width (Jimp v0.x / v1.x uses .bitmap.width or .getWidth())
+        if (image.getWidth() > 1024) {
+            image.resize(1024, Jimp.AUTO);
+        }
+
+        // Apply filters
+        image
+            .greyscale()
+            .contrast(1);
+
+        const processedBuffer = await image.getBufferAsync(Jimp.MIME_JPEG);
+
+        // Perform OCR with Whitelist on PROCESSED image
+        const { data: { text } } = await Tesseract.recognize(processedBuffer, 'eng', {
+            logger: (m: any) => console.log(m),
             tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
         } as any);
 
