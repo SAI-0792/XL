@@ -12,8 +12,15 @@ export const scanLicensePlate = async (req: Request & { file?: Express.Multer.Fi
     try {
         // @ts-ignore
         if (!req.file) {
+            console.error("ANPR Error: No image uploaded.");
             return res.status(400).json({ error: 'No image uploaded' });
         }
+
+        if (!process.env.GEMINI_API_KEY) {
+            console.error("CRITICAL: GEMINI_API_KEY is missing in backend environment variables.");
+            return res.status(500).json({ error: 'Server Misconfiguration: AI Key Missing' });
+        }
+
 
         // Image Preprocessing with Jimp (Computer Vision techniques)
         const image = await Jimp.read(req.file.buffer);
