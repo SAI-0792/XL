@@ -1,8 +1,8 @@
 import { Request, Response } from 'express';
 import { Server } from 'socket.io';
-import fs from 'fs';
-import path from 'path';
-import { spawn } from 'child_process';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 export const scanLicensePlate = async (req: Request & { file?: Express.Multer.File }, res: Response) => {
     try {
@@ -12,85 +12,66 @@ export const scanLicensePlate = async (req: Request & { file?: Express.Multer.Fi
             return res.status(400).json({ error: 'No image uploaded' });
         }
 
-        // Save buffer to a temporary file for the Python script to read
-        const tempDir = path.join(__dirname, '../../temp');
-        if (!fs.existsSync(tempDir)) {
-            fs.mkdirSync(tempDir, { recursive: true });
+        console.log(`Analyzing image with Gemini API...`);
+
+        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
+        // Convert buffer to base64
+        const base64Image = req.file.buffer.toString('base64');
+        const mimeType = req.file.mimetype || 'image/jpeg';
+
+        const prompt = `You are a license plate recognition system. Look at this image and extract ANY text that appears to be a vehicle license plate number. 
+Rules:
+- Return ONLY the plate number, nothing else
+- Remove spaces and special characters 
+- If you see an Indian plate like "AP 07 TA 4050", return "AP07TA4050"
+- If you cannot find a license plate, return exactly "NONE"
+- Do NOT add any explanation, just the plate text`;
+
+        const result = await model.generateContent([
+            prompt,
+            {
+                inlineData: {
+                    data: base64Image,
+                    mimeType: mimeType
+                }
+            }
+        ]);
+
+        const response = await result.response;
+        const detectedText = response.text().trim().replace(/\s+/g, '');
+
+        console.log(`Gemini Raw Response: "${detectedText}"`);
+
+        if (detectedText && detectedText !== 'NONE' && detectedText.length >= 4) {
+            const plateData = {
+                plateNumber: detectedText,
+                timestamp: new Date(),
+                rawText: detectedText
+            };
+
+            console.log("Gemini Detected:", plateData.plateNumber);
+
+            // Emit to Kiosk via Socket.io
+            const io: Server = req.app.get('io');
+            if (io) {
+                io.emit('plate_detected', plateData);
+            }
+
+            return res.json({ success: true, data: plateData });
+        } else {
+            console.warn("Gemini: No valid plate found.");
+            return res.status(422).json({ error: 'No license plate detected' });
         }
 
-        const tempFilePath = path.join(tempDir, `scan_${Date.now()}.jpg`);
-        fs.writeFileSync(tempFilePath, req.file.buffer);
+    } catch (error: any) {
+        console.error('ANPR Controller Error:', error.message || error);
 
-        console.log(`Analyzing image with EasyOCR: ${tempFilePath}`);
+        // Handle rate limiting specifically
+        if (error.status === 429) {
+            return res.status(429).json({ error: 'Rate limited, please wait and try again' });
+        }
 
-        // Spawn Python process
-        // Dockerfile installs deps globally for system python
-        const pythonProcess = spawn('python3', ['src/ocr_engine.py', tempFilePath]);
-
-        let resultData = '';
-        let errorData = '';
-
-        pythonProcess.stdout.on('data', (data) => {
-            console.log(`Python Output Chunk: ${data.toString()}`);
-            resultData += data.toString();
-        });
-
-        pythonProcess.stderr.on('data', (data) => {
-            errorData += data.toString();
-            // Don't log "Using CPU" as error, it's just info
-            if (!data.toString().includes("Using CPU")) {
-                console.error(`Python stderr: ${data}`);
-            }
-        });
-
-        pythonProcess.on('close', (code) => {
-            // Cleanup temp file
-            try {
-                if (fs.existsSync(tempFilePath)) {
-                    fs.unlinkSync(tempFilePath);
-                }
-            } catch (err) {
-                console.error("Failed to delete temp file:", err);
-            }
-
-            if (code !== 0) {
-                console.error(`Python process exited with code ${code}`);
-                return res.status(500).json({ error: 'OCR Engine failed' });
-            }
-
-            try {
-                // Parse JSON output from Python
-                const parsed = JSON.parse(resultData);
-
-                if (parsed.success && parsed.plate && parsed.plate.length >= 4) {
-                    const plateData = {
-                        plateNumber: parsed.plate,
-                        timestamp: new Date(),
-                        rawText: parsed.raw_results ? parsed.raw_results.join(', ') : ''
-                    };
-
-                    console.log("EasyOCR Detected:", plateData.plateNumber);
-
-                    // Emit to Kiosk via Socket.io
-                    const io: Server = req.app.get('io');
-                    if (io) {
-                        io.emit('plate_detected', plateData);
-                    }
-
-                    return res.json({ success: true, data: plateData });
-                } else {
-                    console.warn("EasyOCR: No valid plate found.", parsed);
-                    return res.status(422).json({ error: 'No license plate detected', details: parsed });
-                }
-
-            } catch (jsonError) {
-                console.error("Failed to parse Python output:", resultData);
-                return res.status(500).json({ error: 'Invalid response from OCR engine' });
-            }
-        });
-
-    } catch (error) {
-        console.error('ANPR Controller Error:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 };

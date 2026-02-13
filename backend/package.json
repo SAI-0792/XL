@@ -4,8 +4,7 @@
   "scripts": {
     "start": "node dist/server.js",
     "dev": "ts-node-dev src/server.ts",
-    "build": "tsc",
-    "postinstall": "pip3 install -r requirements.txt --break-system-packages || pip3 install -r requirements.txt --user || echo 'Pip install failed' && python3 src/download_model.py || echo 'Model download failed'"
+    "build": "tsc"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
