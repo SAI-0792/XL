@@ -8,7 +8,9 @@ def extract_plate(image_path):
     try:
         # Initialize EasyOCR Reader
         # gpu=False for Render free tier (CPU only), allow_list helps accuracy
-        reader = easyocr.Reader(['en'], gpu=False)
+        # Use local model directory to avoid runtime downloads
+        model_dir = os.path.join(os.path.dirname(__file__), 'easyocr_model')
+        reader = easyocr.Reader(['en'], gpu=False, model_storage_directory=model_dir, download_enabled=False)
         
         # Read the image
         result = reader.readtext(image_path)
