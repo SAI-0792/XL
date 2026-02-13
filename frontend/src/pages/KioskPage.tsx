@@ -140,9 +140,10 @@ const KioskPage = () => {
                 setVehicleType(null);
                 setDuration(2);
             }, 6000);
-        } catch (error) {
+        } catch (error: any) {
             console.error("Booking failed", error);
-            alert("Payment successful but booking failed. Please contact support.");
+            const errorMsg = error?.response?.data?.error || error?.message || 'Unknown error';
+            alert(`Booking failed: ${errorMsg}`);
             setShowPayment(false);
         }
     };
