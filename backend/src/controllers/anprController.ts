@@ -46,34 +46,19 @@ function callOCRSpace(imageBuffer: Buffer, mimeType: string): Promise<string> {
     });
 }
 
-function extractPlate(rawText: string): string | null {
+function extractAllPlates(rawText: string): string[] {
     // Clean up OCR text
     const cleaned = rawText.toUpperCase().replace(/[^A-Z0-9\n]/g, '');
     console.log(`OCR.space Raw: "${rawText.trim()}" -> Cleaned: "${cleaned}"`);
 
-    // Indian License Plate pattern: XX00XX0000
-    const platePattern = /[A-Z]{2}\d{1,2}[A-Z]{1,3}\d{3,4}/;
-    const match = cleaned.match(platePattern);
+    // Indian License Plate pattern: XX00XX0000 (global flag to find ALL)
+    const platePattern = /[A-Z]{2}\d{1,2}[A-Z]{1,3}\d{3,4}/g;
+    const allMatches = cleaned.match(platePattern) || [];
 
-    if (match) {
-        return match[0];
-    }
-
-    // Try each line separately
-    const lines = cleaned.split('\n').filter(l => l.length > 0);
-    for (const line of lines) {
-        const lineMatch = line.match(platePattern);
-        if (lineMatch) return lineMatch[0];
-
-        // Fallback: any 6-12 char alphanumeric string with both letters and numbers
-        if (line.length >= 6 && line.length <= 12) {
-            if (/[A-Z]/.test(line) && /\d/.test(line)) {
-                return line;
-            }
-        }
-    }
-
-    return null;
+    // Deduplicate
+    const uniquePlates = [...new Set(allMatches)];
+    console.log(`Found ${uniquePlates.length} plate(s):`, uniquePlates);
+    return uniquePlates;
 }
 
 export const scanLicensePlate = async (req: Request & { file?: Express.Multer.File }, res: Response) => {
@@ -89,28 +74,31 @@ export const scanLicensePlate = async (req: Request & { file?: Express.Multer.Fi
         const mimeType = req.file.mimetype || 'image/jpeg';
         const rawText = await callOCRSpace(req.file.buffer, mimeType);
 
-        const plateText = extractPlate(rawText);
+        const plates = extractAllPlates(rawText);
 
-        if (plateText && plateText.length >= 4) {
-            const plateData = {
-                plateNumber: plateText,
-                timestamp: new Date(),
-                rawText: rawText.trim()
-            };
-
-            console.log("✅ Detected:", plateData.plateNumber);
-
-            // Emit to Kiosk via Socket.io
+        if (plates.length > 0) {
             const io: Server = req.app.get('io');
-            if (io) {
-                const connectedSockets = io.engine?.clientsCount || 'unknown';
-                console.log(`📡 Emitting plate_detected to ${connectedSockets} connected clients`);
-                io.emit('plate_detected', plateData);
-            } else {
-                console.error("❌ Socket.io NOT available on app!");
+            const connectedSockets = io?.engine?.clientsCount || 'unknown';
+
+            // Emit EACH detected plate to the kiosk
+            for (const plate of plates) {
+                const plateData = {
+                    plateNumber: plate,
+                    timestamp: new Date(),
+                    rawText: rawText.trim()
+                };
+
+                console.log(`✅ Detected: ${plate}`);
+
+                if (io) {
+                    console.log(`📡 Emitting plate_detected (${plate}) to ${connectedSockets} connected clients`);
+                    io.emit('plate_detected', plateData);
+                } else {
+                    console.error("❌ Socket.io NOT available on app!");
+                }
             }
 
-            return res.json({ success: true, data: plateData });
+            return res.json({ success: true, data: { plates, count: plates.length } });
         } else {
             console.warn("No valid plate found. Raw:", rawText.trim());
             return res.status(422).json({ error: 'No license plate detected', rawText: rawText.trim() });
