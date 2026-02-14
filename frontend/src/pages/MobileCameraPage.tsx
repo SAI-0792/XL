@@ -97,7 +97,8 @@ const MobileCameraPage = () => {
                     });
 
                     if (response.data.success) {
-                        setLastResult(`Detected: ${response.data.data.plateNumber}`);
+                        const plates = response.data.data.plates || [response.data.data.plateNumber];
+                        setLastResult(`Detected: ${plates.join(', ')}`);
                         setError(null);
                     }
                 } catch (err: any) {
