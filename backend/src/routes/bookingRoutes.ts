@@ -63,12 +63,25 @@ router.get('/', protect, async (req: any, res) => {
             }
         }
 
-        const bookings = await Booking.find({
-            $or: [
-                { userId: req.user.id },
-                { userId: { $in: [null, undefined] }, carNumber: { $in: allPlateVariants } }
-            ]
-        }).populate('slotId').sort({ createdAt: -1 });
+        if (!req.user || !req.user.id) {
+            return res.status(401).json({ error: 'User not authenticated properly' });
+        }
+
+        const bookingsQuery: any = {
+            $or: [{ userId: req.user.id }]
+        };
+
+        if (allPlateVariants.length > 0) {
+            bookingsQuery.$or.push({
+                userId: null,
+                carNumber: { $in: allPlateVariants }
+            });
+        }
+
+        console.log(`[DEBUG] Fetching bookings for User: ${req.user.id}`);
+        // console.log(`[DEBUG] Plates:`, allPlateVariants); // Uncomment for detailed debug
+
+        const bookings = await Booking.find(bookingsQuery).populate('slotId').sort({ createdAt: -1 });
 
         res.json(bookings);
     } catch (err: any) {
