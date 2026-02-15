@@ -33,36 +33,38 @@ export const getDashboardStats = async (req: Request, res: Response) => {
 
         console.log(`[DEBUG Dashboard] User: ${userId} | Plates: ${validPlates.join(', ')}`);
 
+        // Fetch all candidates (newest first)
+        const candidateBookings = await Booking.find(bookingQuery).populate('slotId').sort({ createdAt: -1 });
 
-        // Calculate Total Bookings
-        const totalBookings = await Booking.countDocuments(bookingQuery);
+        // STRICT IN-MEMORY FILTERING
+        const validatedBookings = candidateBookings.filter(b => {
+            const bUserId = b.userId ? b.userId.toString() : null;
+            const bCarNumber = b.carNumber;
 
-        const revenueMatch: any = {
-            $or: [
-                { userId: new mongoose.Types.ObjectId(userId) }
-            ]
-        };
+            // 1. Explicitly linked to this user
+            if (bUserId === userId) return true;
 
-        if (validPlates.length > 0) {
-            revenueMatch.$or.push({
-                userId: { $in: [null, undefined] },
-                carNumber: { $in: validPlates }
-            });
-        }
+            // 2. Unlinked Kiosk booking (userId is null) AND matches a managed plate
+            if (!bUserId && bCarNumber && validPlates.includes(bCarNumber)) return true;
 
-        const revenueResult = await Booking.aggregate([
-            { $match: revenueMatch },
-            { $group: { _id: null, total: { $sum: "$totalCost" } } }
-        ]);
-        const totalRevenue = revenueResult.length > 0 ? revenueResult[0].total : 0;
+            return false;
+        });
+
+        console.log(`[DEBUG Dashboard] User: ${userId} | Candidates: ${candidateBookings.length} | Validated: ${validatedBookings.length}`);
+
+        // Calculate Stats from validated list
+        const totalBookings = validatedBookings.length;
+
+        const totalRevenue = validatedBookings
+            .filter(b => b.status === 'COMPLETED' || b.status === 'ACTIVE')
+            .reduce((sum, b) => sum + (b.totalCost || 0), 0);
+
 
         // Get Current Active Booking
-        const activeBooking = await Booking.findOne({
-            ...bookingQuery,
-            status: { $in: ['PENDING_ARRIVAL', 'ACTIVE'] }
-        })
-            .sort({ createdAt: -1 })
-            .populate('slotId');
+        // Get Current Active Booking from validated list
+        const activeBooking = validatedBookings.find(b =>
+            ['PENDING_ARRIVAL', 'ACTIVE'].includes(b.status)
+        );
 
         // Get Occupancy Status (Global, not per user)
         const totalSlots = await ParkingSlot.countDocuments();
