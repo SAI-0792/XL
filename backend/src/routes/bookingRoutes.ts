@@ -79,7 +79,9 @@ router.get('/', protect, async (req: any, res) => {
         }
 
         console.log(`[DEBUG] Fetching bookings for User: ${req.user.id}`);
-        // console.log(`[DEBUG] Plates:`, allPlateVariants); // Uncomment for detailed debug
+        console.log(`[DEBUG] User Managed Cars:`, user?.managedCars);
+        console.log(`[DEBUG] Computed Plate Variants:`, allPlateVariants);
+        console.log(`[DEBUG] Final Query:`, JSON.stringify(bookingsQuery, null, 2));
 
         const bookings = await Booking.find(bookingsQuery).populate('slotId').sort({ createdAt: -1 });
 

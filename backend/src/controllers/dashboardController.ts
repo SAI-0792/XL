@@ -9,23 +9,30 @@ export const getDashboardStats = async (req: Request, res: Response) => {
         const userId = (req as any).user.id;
         const user = await User.findById(userId);
 
+        if (!userId) {
+            return res.status(401).json({ message: 'User not authenticated properly' });
+        }
+
         const validPlates = (user?.managedCars || []).filter(p => typeof p === 'string' && p.trim().length > 0);
 
         // Query matches:
         // 1. Bookings explicitly linked to this userId
-        // 2. Unlinked bookings (where userId is null/absent) matching user's specific plates
         const bookingQuery: any = {
             $or: [
                 { userId: userId }
             ]
         };
 
+        // 2. Unlinked bookings (where userId is null/absent) matching user's specific plates
         if (validPlates.length > 0) {
             bookingQuery.$or.push({
-                userId: { $in: [null, undefined] },
+                userId: null,
                 carNumber: { $in: validPlates }
             });
         }
+
+        console.log(`[DEBUG Dashboard] User: ${userId} | Plates: ${validPlates.join(', ')}`);
+
 
         // Calculate Total Bookings
         const totalBookings = await Booking.countDocuments(bookingQuery);
