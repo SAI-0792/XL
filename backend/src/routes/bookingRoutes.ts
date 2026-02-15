@@ -83,7 +83,24 @@ router.get('/', protect, async (req: any, res) => {
         console.log(`[DEBUG] Computed Plate Variants:`, allPlateVariants);
         console.log(`[DEBUG] Final Query:`, JSON.stringify(bookingsQuery, null, 2));
 
-        const bookings = await Booking.find(bookingsQuery).populate('slotId').sort({ createdAt: -1 });
+        // Fetch potentially matching bookings (broad query)
+        const candidateBookings = await Booking.find(bookingsQuery).populate('slotId').sort({ createdAt: -1 });
+
+        // STRICT IN-MEMORY FILTERING
+        // Double-check allows us to be 100% sure we only return valid data
+        const bookings = candidateBookings.filter(b => {
+            // 1. Owned by user?
+            if (b.userId && b.userId.toString() === req.user.id) return true;
+
+            // 2. Kiosk booking (no user) matching one of user's plates?
+            if (!b.userId && b.carNumber && allPlateVariants.includes(b.carNumber)) return true;
+
+            // 3. Otherwise, FILTER OUT
+            console.warn(`[SECURITY WARN] Filtered out unauthorized booking ${b._id} for user ${req.user.id}`);
+            return false;
+        });
+
+        console.log(`[DEBUG] Returning ${bookings.length} verified bookings out of ${candidateBookings.length} candidates.`);
 
         res.json(bookings);
     } catch (err: any) {
