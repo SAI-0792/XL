@@ -14,6 +14,21 @@ router.post('/', optionalProtect, async (req: any, res) => {
         // Use req.user.id if logged in (WEB), otherwise null (KIOSK will auto-link via plate)
         const userId = req.user ? req.user.id : null;
 
+        // If user is logged in, ensure the car plate is in their registered vehicles
+        if (userId && carNumber) {
+            const user = await User.findById(userId);
+            const normalizedInput = carNumber.toUpperCase().replace(/[\s\-\.]/g, '').trim();
+            const userPlates = (user?.managedCars || []).map((p: string) =>
+                p.toUpperCase().replace(/[\s\-\.]/g, '').trim()
+            );
+
+            if (userPlates.length > 0 && !userPlates.includes(normalizedInput)) {
+                return res.status(400).json({
+                    error: 'This vehicle is not registered to your account. Please add it in your Profile first.'
+                });
+            }
+        }
+
         const booking = await createBooking(userId, carNumber, slotId, startTime, endTime, source || 'WEB');
         res.json(booking);
     } catch (err: any) {
