@@ -118,6 +118,21 @@ const AdminDashboardPage = () => {
         navigate('/admin');
     };
 
+    const handleCancelBooking = async (bookingId: string) => {
+        if (!window.confirm('Are you sure you want to cancel this booking?')) return;
+        try {
+            await api.post(`/bookings/${bookingId}/cancel`);
+            // Refresh data to reflect the new state immediately
+            const bookingsRes = await api.get('/admin/bookings');
+            setBookings(bookingsRes.data || []);
+            const slotsRes = await api.get('/slots');
+            setSlots(slotsRes.data.slots || []);
+        } catch (error) {
+            console.error('Error cancelling booking:', error);
+            alert('Failed to cancel booking. Please try again.');
+        }
+    };
+
     const getVehicleIcon = (type: string) => {
         switch (type) {
             case 'BIKE': return '🏍️';
@@ -349,12 +364,13 @@ const AdminDashboardPage = () => {
                                     <th className="pb-4 font-medium">Out Time</th>
                                     <th className="pb-4 font-medium">Amount</th>
                                     <th className="pb-4 font-medium">Status</th>
+                                    <th className="pb-4 font-medium">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {filteredBookings.length === 0 ? (
                                     <tr>
-                                        <td colSpan={7} className="text-center py-8 text-gray-500">
+                                        <td colSpan={8} className="text-center py-8 text-gray-500">
                                             No bookings found
                                         </td>
                                     </tr>
@@ -394,6 +410,16 @@ const AdminDashboardPage = () => {
                                                 <span className={`px-3 py-1 rounded-lg text-xs font-bold border ${getStatusBadge(booking.status)}`}>
                                                     {booking.status.replace('_', ' ')}
                                                 </span>
+                                            </td>
+                                            <td className="py-4">
+                                                {(booking.status === 'ACTIVE' || booking.status === 'PENDING_ARRIVAL') && (
+                                                    <button
+                                                        onClick={() => handleCancelBooking(booking._id)}
+                                                        className="bg-red-600/20 text-red-500 border border-red-500/30 px-3 py-1 rounded-lg hover:bg-red-600/30 transition text-xs font-bold"
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                )}
                                             </td>
                                         </tr>
                                     ))
@@ -492,8 +518,8 @@ const AdminDashboardPage = () => {
                                                     }
                                                 }}
                                                 className={`text-[10px] uppercase font-bold px-2 py-1 rounded transition ${msg.priority === 'HIGH'
-                                                        ? 'bg-white/10 text-gray-400 hover:bg-white/20'
-                                                        : 'bg-red-500/20 text-red-500 hover:bg-red-500/30'
+                                                    ? 'bg-white/10 text-gray-400 hover:bg-white/20'
+                                                    : 'bg-red-500/20 text-red-500 hover:bg-red-500/30'
                                                     }`}
                                             >
                                                 {msg.priority === 'HIGH' ? 'Unprioritize' : 'Prioritize'}
