@@ -5,7 +5,7 @@ import PaymentModal from '../components/PaymentModal';
 import { fetchSlots, createBooking, checkEntry } from '../services/api';
 
 const KioskPage = () => {
-    const [step, setStep] = useState<'DETECTING' | 'SELECT_VEHICLE' | 'SELECT_SLOT' | 'SELECT_DURATION' | 'CONFIRMED' | 'ENTRY_GRANTED'>('DETECTING');
+    const [step, setStep] = useState<'DETECTING' | 'SELECT_VEHICLE' | 'SELECT_SLOT' | 'SELECT_DURATION' | 'CONFIRMED' | 'ENTRY_GRANTED' | 'ALREADY_INSIDE'>('DETECTING');
     const [detectedPlate, setDetectedPlate] = useState<string>('');
     const [vehicleType, setVehicleType] = useState<'CAR' | 'BIKE' | 'TRUCK' | 'HANDICAPPED' | null>(null);
     const [selectedSlot, setSelectedSlot] = useState<any>(null);
@@ -62,13 +62,23 @@ const KioskPage = () => {
             console.log("Checking entry for:", plateToCheck);
             const result = await checkEntry(plateToCheck);
             if (result.matched) {
-                // Existing booking found — grant entry
-                setStep('ENTRY_GRANTED');
-                setTimeout(() => {
-                    setStep('DETECTING');
-                    setDetectedPlate('');
-                    setVehicleType(null);
-                }, 5000);
+                if (result.alreadyActive) {
+                    // Vehicle is already checked in — deny entry
+                    setStep('ALREADY_INSIDE');
+                    setTimeout(() => {
+                        setStep('DETECTING');
+                        setDetectedPlate('');
+                        setVehicleType(null);
+                    }, 5000);
+                } else {
+                    // Existing booking found — grant entry
+                    setStep('ENTRY_GRANTED');
+                    setTimeout(() => {
+                        setStep('DETECTING');
+                        setDetectedPlate('');
+                        setVehicleType(null);
+                    }, 5000);
+                }
             } else {
                 // No booking at all — let them create one at kiosk
                 setStep('SELECT_VEHICLE');
@@ -345,6 +355,17 @@ const KioskPage = () => {
                         <h2 className="text-5xl font-bold text-white mb-4">Welcome Back!</h2>
                         <p className="text-2xl text-blue-300">Web Booking Detected. Gate Opening...</p>
                         <div className="mt-12 text-gray-500 font-mono">Status: CHECK-IN COMPLETE</div>
+                    </div>
+                )}
+
+                {step === 'ALREADY_INSIDE' && (
+                    <div className="flex flex-col items-center justify-center animate-zoom-in text-center">
+                        <div className="w-32 h-32 bg-amber-500 rounded-full flex items-center justify-center mb-8 shadow-[0_0_50px_#fbbf24]">
+                            <svg className="w-16 h-16 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                        </div>
+                        <h2 className="text-5xl font-bold text-white mb-4">Entry Denied</h2>
+                        <p className="text-2xl text-amber-300">Vehicle is already active inside the facility.</p>
+                        <div className="mt-12 text-gray-400 font-mono">If you have exited, please contact the administrator.</div>
                     </div>
                 )}
 
