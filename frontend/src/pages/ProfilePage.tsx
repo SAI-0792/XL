@@ -6,7 +6,7 @@ import { fetchUserProfile, updateUserProfile, addVehicle, removeVehicle } from '
 interface Vehicle {
     _id: string;
     plateNumber: string;
-    type: 'CAR' | 'BIKE' | 'TRUCK';
+    type: 'CAR' | 'BIKE' | 'TRUCK' | 'HANDICAPPED';
     nickname?: string;
 }
 
@@ -83,6 +83,7 @@ const ProfilePage = () => {
 
     const getVehicleIcon = (type: string) => {
         switch (type) {
+            case 'HANDICAPPED': return '♿';
             case 'BIKE': return '🏍️';
             case 'TRUCK': return '🚛';
             default: return '🚗';
@@ -190,6 +191,7 @@ const ProfilePage = () => {
                                     <option value="CAR">🚗 Car</option>
                                     <option value="BIKE">🏍️ Bike</option>
                                     <option value="TRUCK">🚛 Truck</option>
+                                    <option value="HANDICAPPED">♿ Physically Handicapped</option>
                                 </select>
                                 <input
                                     type="text"

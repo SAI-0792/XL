@@ -2,7 +2,7 @@ import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IVehicle {
     plateNumber: string;
-    type: 'CAR' | 'BIKE' | 'TRUCK';
+    type: 'CAR' | 'BIKE' | 'TRUCK' | 'HANDICAPPED';
     nickname?: string; // e.g., "My Honda", "Office Bike"
 }
 
@@ -20,7 +20,7 @@ export interface IUser extends Document {
 
 const VehicleSchema = new Schema({
     plateNumber: { type: String, required: true },
-    type: { type: String, enum: ['CAR', 'BIKE', 'TRUCK'], required: true },
+    type: { type: String, enum: ['CAR', 'BIKE', 'TRUCK', 'HANDICAPPED'], required: true },
     nickname: { type: String }
 }, { _id: true });
 

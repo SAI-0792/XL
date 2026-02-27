@@ -11,17 +11,17 @@ export const getSlots = async (req: Request, res: Response) => {
         if (slots.length === 0) {
             const seedSlots = [];
 
-            // Zone A: Handicapped (A1-A2) and Cars (A3-A6)
-            seedSlots.push({ slotNumber: 'A1', type: 'HANDICAPPED' as const, status: 'AVAILABLE' as const, zone: 'A' as const });
-            seedSlots.push({ slotNumber: 'A2', type: 'HANDICAPPED' as const, status: 'AVAILABLE' as const, zone: 'A' as const });
-            for (let i = 3; i <= 6; i++) seedSlots.push({ slotNumber: `A${i}`, type: 'CAR' as const, status: 'AVAILABLE' as const, zone: 'A' as const });
+            // Zone A: Cars (A1-A6)
+            for (let i = 1; i <= 6; i++) seedSlots.push({ slotNumber: `A${i}`, type: 'CAR' as const, status: 'AVAILABLE' as const, zone: 'A' as const });
 
-            // Zone B: Cars (B1-B6)
-            for (let i = 1; i <= 6; i++) seedSlots.push({ slotNumber: `B${i}`, type: 'CAR' as const, status: 'AVAILABLE' as const, zone: 'B' as const });
+            // Zone B: Handicapped (B1-B2) and Cars (B3-B6)
+            seedSlots.push({ slotNumber: 'B1', type: 'HANDICAPPED' as const, status: 'AVAILABLE' as const, zone: 'B' as const });
+            seedSlots.push({ slotNumber: 'B2', type: 'HANDICAPPED' as const, status: 'AVAILABLE' as const, zone: 'B' as const });
+            for (let i = 3; i <= 6; i++) seedSlots.push({ slotNumber: `B${i}`, type: 'CAR' as const, status: 'AVAILABLE' as const, zone: 'B' as const });
 
-            // Zone C: Bikes (C1-C3) and Trucks (C4-C6)
-            for (let i = 1; i <= 3; i++) seedSlots.push({ slotNumber: `C${i}`, type: 'BIKE' as const, status: 'AVAILABLE' as const, zone: 'C' as const });
-            for (let i = 4; i <= 6; i++) seedSlots.push({ slotNumber: `C${i}`, type: 'TRUCK' as const, status: 'AVAILABLE' as const, zone: 'C' as const });
+            // Zone C: Trucks (C1-C3) and Bikes (C4-C6)
+            for (let i = 1; i <= 3; i++) seedSlots.push({ slotNumber: `C${i}`, type: 'TRUCK' as const, status: 'AVAILABLE' as const, zone: 'C' as const });
+            for (let i = 4; i <= 6; i++) seedSlots.push({ slotNumber: `C${i}`, type: 'BIKE' as const, status: 'AVAILABLE' as const, zone: 'C' as const });
 
             slots = await ParkingSlot.insertMany(seedSlots);
             console.log('Seeded 18 specialized parking slots');

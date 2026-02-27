@@ -7,7 +7,7 @@ import { fetchSlots, createBooking, fetchUserProfile, checkBookingAvailability }
 interface Vehicle {
     _id: string;
     plateNumber: string;
-    type: 'CAR' | 'BIKE' | 'TRUCK';
+    type: 'CAR' | 'BIKE' | 'TRUCK' | 'HANDICAPPED';
     nickname?: string;
 }
 
@@ -111,6 +111,7 @@ const BookingPage = () => {
 
     const getVehicleIcon = (type: string) => {
         switch (type) {
+            case 'HANDICAPPED': return '♿';
             case 'BIKE': return '🏍️';
             case 'TRUCK': return '🚛';
             default: return '🚗';

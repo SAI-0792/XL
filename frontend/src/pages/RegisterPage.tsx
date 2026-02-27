@@ -8,7 +8,7 @@ const RegisterPage = () => {
         name: '',
         email: '',
         password: '',
-        vehicleType: 'CAR' as 'CAR' | 'BIKE' | 'TRUCK',
+        vehicleType: 'CAR' as 'CAR' | 'BIKE' | 'TRUCK' | 'HANDICAPPED',
         carNumber: ''
     });
     const [loading, setLoading] = useState(false);
@@ -97,12 +97,13 @@ const RegisterPage = () => {
                         <select
                             className="w-full bg-black/50 border border-gray-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition"
                             value={formData.vehicleType}
-                            onChange={(e) => setFormData({ ...formData, vehicleType: e.target.value as 'CAR' | 'BIKE' | 'TRUCK' })}
+                            onChange={(e) => setFormData({ ...formData, vehicleType: e.target.value as 'CAR' | 'BIKE' | 'TRUCK' | 'HANDICAPPED' })}
                             required
                         >
                             <option value="CAR">Car</option>
                             <option value="BIKE">Bike</option>
                             <option value="TRUCK">Truck</option>
+                            <option value="HANDICAPPED">Physically Handicapped</option>
                         </select>
                     </div>
 
