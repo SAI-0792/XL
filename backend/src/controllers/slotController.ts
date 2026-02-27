@@ -75,9 +75,16 @@ export const updateSlotStatus = async (req: Request, res: Response) => {
         if (String(slot_id) === '3') {
             console.log(`Gate sensor update: status=${status}, distance=${distance}`);
             if (status === 'OCCUPIED') {
-                // Vehicle detected at gate — check if any active/pending booking exists
+                // Vehicle detected at gate — check if any active booking exists that was JUST activated
+                // Allow a 2-minute window for the gate to open after payment/camera detection.
+                const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
+
                 const activeBooking = await Booking.findOne({
-                    status: { $in: ['PENDING_ARRIVAL', 'ACTIVE'] }
+                    status: 'ACTIVE',
+                    $or: [
+                        { source: 'KIOSK', createdAt: { $gte: twoMinutesAgo } },
+                        { source: 'WEB', actualStartTime: { $gte: twoMinutesAgo } }
+                    ]
                 }).sort({ updatedAt: -1 });
 
                 if (activeBooking) {
