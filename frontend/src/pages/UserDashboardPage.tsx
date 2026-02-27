@@ -25,6 +25,7 @@ const UserDashboardPage = () => {
     const [chatSending, setChatSending] = useState(false);
     const [chatSent, setChatSent] = useState(false);
     const [chatMessages, setChatMessages] = useState<any[]>([]);
+    const [timeLeftMinutes, setTimeLeftMinutes] = useState<number | null>(null);
 
     const EMERGENCY_NUMBER = '9381276836';
 
@@ -72,6 +73,26 @@ const UserDashboardPage = () => {
         const interval = setInterval(loadData, 5000);
         return () => clearInterval(interval);
     }, []);
+
+    useEffect(() => {
+        // Interval to check time left every minute
+        const checkTimeLeft = () => {
+            if (activeBooking && activeBooking.endTime) {
+                const now = new Date();
+                const end = new Date(activeBooking.endTime);
+                const diffMs = end.getTime() - now.getTime();
+                const diffMins = Math.floor(diffMs / 60000);
+
+                setTimeLeftMinutes(diffMins);
+            } else {
+                setTimeLeftMinutes(null);
+            }
+        };
+
+        checkTimeLeft();
+        const interval = setInterval(checkTimeLeft, 60000); // Check every minute
+        return () => clearInterval(interval);
+    }, [activeBooking]);
 
     const handleExtendConfirm = async () => {
         setIsExtending(false);
@@ -158,6 +179,25 @@ const UserDashboardPage = () => {
                             </div>
                         ))}
                     </div>
+
+                    {/* Exit Time Warning Banner */}
+                    {activeBooking && timeLeftMinutes !== null && timeLeftMinutes <= 10 && timeLeftMinutes >= 0 && (
+                        <div className="bg-red-500/20 border-l-4 border-red-500 rounded-r-2xl p-6 mb-8 flex flex-col md:flex-row items-center justify-between text-white shadow-[0_0_30px_rgba(239,68,68,0.2)] animate-pulse">
+                            <div className="flex items-center mb-4 md:mb-0">
+                                <span className="text-3xl mr-4">⚠️</span>
+                                <div>
+                                    <h3 className="text-xl font-bold text-red-400">Warning: Session Expiring Soon</h3>
+                                    <p className="text-red-200/80">Your parking session will expire in <strong className="text-white text-lg">{timeLeftMinutes} minutes</strong>. Please extend your session or exit to avoid penalties.</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setIsExtending(true)}
+                                className="px-6 py-2 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl shadow-lg transition transform hover:-translate-y-0.5 whitespace-nowrap"
+                            >
+                                Extend Now
+                            </button>
+                        </div>
+                    )}
 
                     {/* Active Booking Card */}
                     {activeBooking && (
@@ -336,8 +376,8 @@ const UserDashboardPage = () => {
                                     <div
                                         key={msg._id || idx}
                                         className={`max-w-[85%] p-2 rounded-xl text-sm ${msg.senderType === 'USER'
-                                                ? 'bg-blue-600 text-white self-end rounded-tr-none'
-                                                : 'bg-gray-800 text-gray-200 self-start rounded-tl-none border border-gray-700'
+                                            ? 'bg-blue-600 text-white self-end rounded-tr-none'
+                                            : 'bg-gray-800 text-gray-200 self-start rounded-tl-none border border-gray-700'
                                             }`}
                                     >
                                         {msg.senderType === 'ADMIN' && (
