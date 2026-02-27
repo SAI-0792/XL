@@ -20,7 +20,8 @@ const SlotMap: React.FC<SlotMapProps> = ({ slots, onSlotSelect, filterType = nul
             case 'HANDICAPPED': return '♿';
             case 'BIKE': return '🏍️';
             case 'TRUCK': return '🚛';
-            default: return '🚗';
+            case 'CAR': return '🚗';
+            default: return '❓';
         }
     };
 
